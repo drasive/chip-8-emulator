@@ -20,7 +20,6 @@ args:
     - ignore_unknown_instructions:
         long: ignore-unknown-instructions
         help: Clockrate of the CPU
-        takes_value: false
     - program_address:
         short: p
         long: program-address
@@ -35,8 +34,9 @@ args:
         help: Scaling factor for pixels
         default_value: "10"
         takes_value: true
-    - debug:
-        short: d
-        long: debug
-        help: Run in debug mode
-        takes_value: false
+    - debug_cpu:
+        long: debug-cpu
+        help: Print CPU debug info
+    - debug_memory:
+        long: debug-memory
+        help: Print memory debug info

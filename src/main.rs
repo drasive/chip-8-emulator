@@ -33,7 +33,8 @@ fn main() {
     let ignore_unknown_instructions = parameters.is_present("ignore_unknown_instructions");
     let program_address = value_t!(parameters, "program_address", usize).unwrap();
     let display_scale = value_t!(parameters, "display_scale", u8).unwrap();
-    let debug = parameters.is_present("debug");
+    let debug_cpu = parameters.is_present("debug_cpu");
+    let debug_memory = parameters.is_present("debug_memory");
 
     if clock_rate <= 0.0 {
         panic!("parameter \"clock_rate\" must be > 0");
@@ -76,7 +77,7 @@ fn main() {
 
         // Emulation
         // TODO: Use real synchronisation
-        emulator.step(1.0 / 60.0, &mut renderer, debug);
+        emulator.step(1.0 / 60.0, &mut renderer, debug_cpu, debug_memory);
         thread::sleep(Duration::from_millis(16));
 
         iteration += 1;

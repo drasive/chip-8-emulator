@@ -6,7 +6,7 @@
             "type": "gdb",
             "request": "launch",
             "target": "./target/debug/chip-8-emulator",
-            "arguments": "--rom ./games/ibm.ch8",
+            "arguments": "--rom ./games/pong.ch8 --debug-cpu --debug-memory",
             "cwd": "${workspaceRoot}",
             "terminal": ""
         }

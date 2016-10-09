@@ -132,7 +132,7 @@ impl Cpu {
 
     pub fn step(
         &mut self, memory: &mut Memory, keypad: &mut Keypad, display: &mut Display,
-        delta_time: f32, debug: bool) {
+        delta_time: f32, debug_cpu: bool, debug_memory: bool) {
         let instructions_to_execute = (delta_time * self.clock_rate).round() as usize;
         let delta_time_per_instruction = delta_time / instructions_to_execute as f32;
 
@@ -140,9 +140,15 @@ impl Cpu {
             // Fetch opcode
             self.opcode = (memory.read(self.pc) as u16) << 8 | (memory.read(self.pc + 1) as u16);
 
-            // Debug
-            if debug {
+            // Debugging
+            if debug_cpu && debug_memory {
+                println!("");            
+            }
+
+            if debug_cpu {
                 self.print_debug_info();
+            }
+            if debug_memory {
                 memory.print_debug_info();
             }
 
@@ -156,7 +162,7 @@ impl Cpu {
     }
 
     pub fn print_debug_info(&self) {
-        println!("Opcode: 0x{:X}, PC: {}, I: 0x{:X}, DT: {}, ST: {}",
+        println!("\nOpcode: 0x{:X}, PC: {}, I: 0x{:X}, DT: {}, ST: {}",
                  self.opcode, self.pc, self.i, self.delay_timer, self.sound_timer);
 
         println!("Registers: {:?}", self.v);

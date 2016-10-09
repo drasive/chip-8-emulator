@@ -37,14 +37,16 @@ impl Memory {
     }
 
     pub fn print_debug_info(&self) {
+        println!("");
+
         for index in 0..MEMORY_SIZE {
-            if Memory::modulo(index, 16) == 0 {
-                print!("0x{:X} ", index);
+            if index == 0 || (index > 1 && Memory::modulo(index, 16) == 0) {
+                print!("0x{:03X} ", index);
             }
 
-            print!("{:X} ", self.read(index));
+            print!("{:>02X} ", self.read(index));
 
-            if Memory::modulo(index, 16) == 0 {
+            if index > 0 && Memory::modulo(index + 1, 16) == 0 {
                 println!("");
             }
         }
