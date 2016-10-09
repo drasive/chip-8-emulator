@@ -1,3 +1,5 @@
+extern crate sdl2;
+
 use std::io::{Read, Error};
 
 use cpu::Cpu;
@@ -35,9 +37,9 @@ impl Emulator {
         self.cpu.load_rom(&mut self.memory, reader)
     }
 
-    pub fn step(&mut self, delta_time: f32, debug: bool) {
+    pub fn step(&mut self, delta_time: f32, mut renderer: &mut sdl2::render::Renderer, debug: bool) {
         self.cpu.step(&mut self.memory, &mut self.keypad, &mut self.display, delta_time, debug);
-        self.display.draw();
+        self.display.draw(&mut renderer);
     }
 
 }

@@ -3,18 +3,13 @@ extern crate sdl2;
 use sdl2::rect::Rect;
 use sdl2::pixels::Color;
 
-const SCREEN_WIDTH: usize = 64;
-const SCREEN_HEIGHT: usize = 32;
+const DISPLAY_WIDTH: usize = 64;
+const DISPLAY_HEIGHT: usize = 32;
 
 
 pub struct Display {
 	// General
-	pixels: [[bool; SCREEN_WIDTH]; SCREEN_HEIGHT],
-
-	// Objects
-	ctx: sdl2::Sdl,
-	video_ctx: sdl2::VideoSubsystem,
-	display: sdl2::video::Window,
+	pixels: [[bool; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
 
 	// Configuration
 	display_scale: u8
@@ -27,41 +22,39 @@ impl Display {
     pub fn new(display_scale: u8) -> Display {
     	println!("Initializing display");
 
-		let ctx = sdl2::init().unwrap();
-    	let ctx_video = ctx.video().unwrap();
-    	let display = ctx_video.window("Chip-8 Emulator"
-    		,SCREEN_WIDTH as u32  * display_scale as u32, SCREEN_HEIGHT as u32 * display_scale as u32)
-    		.position_centered().opengl().build().unwrap();
-
     	Display {
     		// General
-    		pixels: [[false; SCREEN_WIDTH]; SCREEN_HEIGHT],
-
-    		// Objects
-    		ctx: ctx,
-    		video_ctx: ctx_video,
-    		display: display,
+    		pixels: [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
 
     		// Configuration
 			display_scale: display_scale
     	}
     }
 
+
     // Methods
+	pub fn create_window(&self, sdl_video: & sdl2::VideoSubsystem) -> sdl2::video::Window {
+		sdl_video.window(
+			"Chip-8 Emulator",
+			DISPLAY_WIDTH as u32 * self.display_scale as u32,
+			DISPLAY_HEIGHT as u32 * self.display_scale as u32)
+			.position_centered().opengl().build().unwrap()
+	}
+
     pub fn draw_sprite(&mut self, x: usize, y: usize, sprite: &[u8]) -> u8 {
     	let mut collision = 0;
 
     	for row in 0..sprite.len() as usize {
     		for column in 0..8 as usize {
-				let xp = (x + column) % SCREEN_WIDTH as usize;
-				let yp = (y + row) % SCREEN_HEIGHT as usize;
+				let xp = (x + column) % DISPLAY_WIDTH as usize;
+				let yp = (y + row) % DISPLAY_HEIGHT as usize;
 
 				if Display::get_bit(sprite[row], column as u8) {
-					let previous_state = self.pixels[yp][xp];
+					let previous_state = self.pixels[xp][yp];
 
-					self.pixels[yp][xp] = true;
+					self.pixels[xp][yp] = true;
 
-					if previous_state && !self.pixels[yp][xp] {
+					if previous_state && !self.pixels[xp][yp] {
 						collision = 1;
 					}
 				}
@@ -71,39 +64,37 @@ impl Display {
     	collision
     }
 
-    pub fn draw(&mut self) {
-		let mut output: String = "".to_owned();
+    pub fn draw(&mut self, renderer: &mut sdl2::render::Renderer) {
+    	for x in 0..DISPLAY_WIDTH - 1 {
+    		for y in 0..DISPLAY_HEIGHT -1 {
+    			let color = if self.pixels[x as usize][y as usize] { 0 } else { 255 };
+    			renderer.set_draw_color(Color::RGB(color, color, color));
 
-		for row in 0..SCREEN_HEIGHT - 1 {
-			for column in 0..SCREEN_WIDTH - 1 {
-				output.push_str(if self.pixels[row as usize][column as usize] { "XX" } else { "__" });
+    			renderer.fill_rect(Rect::new(
+					x as i32 * self.display_scale as i32 , y as i32 * self.display_scale as i32 ,
+					self.display_scale as u32, self.display_scale as u32)).unwrap();
+    		}
+    	}
+
+    	renderer.present();
+
+
+		// stdout renderer used for development
+		/*let mut output: String = "".to_owned();
+
+		for row in 0..DISPLAY_HEIGHT - 1 {
+			for column in 0..DISPLAY_WIDTH - 1 {
+				output.push_str(if self.pixels[column as usize][row as usize] { "XX" } else { "__" });
 			}
 
 			output.push_str("\n");
 		}
 
-		println!("{}", output);
-
-
-		// TODO: Implement real renderer
-		/*let mut renderer = self.display.renderer().build().unwrap();
-		
-    	for x in 0..SCREEN_WIDTH {
-    		for y in 0..SCREEN_HEIGHT {
-    			let color = if self.pixels[x as usize][y as usize] == 0 { 0 } else { 255 };
-    			renderer.set_draw_color(Color::RGB(color, color, color));
-
-    			renderer.draw_rect(Rect::new(x as i32, y as i32, self.display_scale as u32, self.display_scale as u32));
-    		}
-    	}
-
-    	renderer.clear();
-    	renderer.present();
-	    //self.display.show();*/
+		println!("{}", output);*/
     }
 
     pub fn clear(&mut self) {
-    	self.pixels = [[false; SCREEN_WIDTH]; SCREEN_HEIGHT];
+    	self.pixels = [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH];
     }
 
 
