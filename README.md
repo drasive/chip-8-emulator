@@ -12,7 +12,6 @@ It can run Chip-8 program "IBM" but not yet "Pong".*
 - Cross plattform support (Windows, Linux, Mac)
 
 ## TODO
-- Implement SDL2 renderer
 - Implement sound
 - Support variable display and memory sizes
 

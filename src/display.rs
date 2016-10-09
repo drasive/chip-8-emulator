@@ -77,20 +77,6 @@ impl Display {
     	}
 
     	renderer.present();
-
-
-		// stdout renderer used for development
-		/*let mut output: String = "".to_owned();
-
-		for row in 0..DISPLAY_HEIGHT - 1 {
-			for column in 0..DISPLAY_WIDTH - 1 {
-				output.push_str(if self.pixels[column as usize][row as usize] { "XX" } else { "__" });
-			}
-
-			output.push_str("\n");
-		}
-
-		println!("{}", output);*/
     }
 
     pub fn clear(&mut self) {
