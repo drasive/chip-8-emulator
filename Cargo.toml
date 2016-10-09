@@ -1,0 +1,10 @@
+[package]
+name = "chip-8-emulator"
+version = "0.1.0"
+authors = ["Dimitri Vranken <me@dimitrivranken.com>"]
+
+[dependencies]
+rand = "^0"
+time = "^0"
+clap = { version = "^2", features = ["yaml"] }
+sdl2 = "^0"

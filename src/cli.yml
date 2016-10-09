@@ -1,0 +1,42 @@
+name: Chip-8 Emulator
+version: 0.1.0
+author: Dimitri Vranken <me@dimitrivranken.com>
+about: RUST implementation of a Chip-8 interpreter
+args:
+    - rom:
+        short: r
+        long: rom
+        value_name: FILE
+        help: Path to ROM file to load
+        required: true
+        takes_value: true
+    - clock_rate:
+        short: c
+        long: clock-rate
+        value_name: HZ
+        help: Clockrate of the CPU
+        default_value: "600.0"
+        takes_value: true
+    - ignore_unknown_instructions:
+        long: ignore-unknown-instructions
+        help: Clockrate of the CPU
+        takes_value: false
+    - program_address:
+        short: p
+        long: program-address
+        value_name: BYTE
+        help: Memory address where the ROM is stored
+        default_value: "512"
+        takes_value: true
+    - display_scale:
+        short: s
+        long: scale
+        value_name: FACTOR
+        help: Scaling factor for pixels
+        default_value: "10"
+        takes_value: true
+    - debug:
+        short: d
+        long: debug
+        help: Run in debug mode
+        takes_value: false
