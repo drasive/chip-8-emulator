@@ -52,14 +52,10 @@ impl Display {
 				let xp = (x + column) % DISPLAY_WIDTH as usize;
 				let yp = (y + row) % DISPLAY_HEIGHT as usize;
 
-				if Display::get_bit(sprite[row], column as u8) {
-					let previous_state = self.pixels[xp][yp];
-
-					self.pixels[xp][yp] = true;
-
-					if previous_state && !self.pixels[xp][yp] {
-						collision = 1;
-					}
+				let previous_state = self.pixels[xp][yp];
+				self.pixels[xp][yp] ^= Display::get_bit(sprite[row], column as u8);
+				if previous_state && !self.pixels[xp][yp] {
+					collision = 1;
 				}
     		}
     	}
