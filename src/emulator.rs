@@ -39,7 +39,10 @@ impl Emulator {
 
     pub fn step(&mut self, delta_time: f32, mut renderer: &mut sdl2::render::Renderer, debug_cpu: bool, debug_memory: bool) {
         self.cpu.step(&mut self.memory, &mut self.keypad, &mut self.display, delta_time, debug_cpu, debug_memory);
-        self.display.draw(&mut renderer);
+
+        if self.display.needs_redraw() {
+            self.display.draw(&mut renderer);
+        }
     }
 
 

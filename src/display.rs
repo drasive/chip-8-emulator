@@ -10,6 +10,7 @@ const DISPLAY_HEIGHT: usize = 32;
 pub struct Display {
 	// General
 	pixels: [[bool; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
+	needs_redraw: bool,
 
 	// Configuration
 	display_scale: u8
@@ -25,6 +26,7 @@ impl Display {
     	Display {
     		// General
     		pixels: [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
+			needs_redraw: false,
 
     		// Configuration
 			display_scale: display_scale
@@ -42,6 +44,7 @@ impl Display {
 	}
 
     pub fn draw_sprite(&mut self, x: usize, y: usize, sprite: &[u8]) -> u8 {
+		self.needs_redraw = true;
     	let mut collision = 0;
 
     	for row in 0..sprite.len() as usize {
@@ -77,11 +80,17 @@ impl Display {
     	}
 
     	renderer.present();
+		self.needs_redraw = false;
     }
 
     pub fn clear(&mut self) {
     	self.pixels = [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH];
     }
+
+
+	pub fn needs_redraw(&self) -> bool {
+		self.needs_redraw
+	}
 
 
 	// Helpers
