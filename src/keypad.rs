@@ -38,6 +38,11 @@ impl Keypad {
     }
 
 
+	pub fn reset(&mut self) {
+		self.keys = [false; 16]
+	}
+
+
     // Helpers
     fn map_key(keycode: Keycode) -> Option<u8> {
     	match keycode {
