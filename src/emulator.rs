@@ -42,4 +42,9 @@ impl Emulator {
         self.display.draw(&mut renderer);
     }
 
+
+    pub fn get_cpu_clock_rate(&self) -> f32 {
+        self.cpu.get_clock_rate()
+    }
+
 }

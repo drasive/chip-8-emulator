@@ -12,6 +12,7 @@ It can run Chip-8 program "IBM" but not yet "Pong".*
 - Cross plattform support (Windows, Linux, Mac)
 
 ## TODO
+- Get Pong working
 - Implement sound
 - Support variable display and memory sizes
 

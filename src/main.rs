@@ -1,5 +1,3 @@
-// RUST implementation of a Chip-8 interpreter
-
 #[macro_use]
 extern crate clap;
 extern crate sdl2;
@@ -51,20 +49,22 @@ fn main() {
 	let mut rom_file = File::open(&Path::new(rom)).unwrap();
 	emulator.load_rom(&mut rom_file).unwrap();
     
-	// Game loop
+	// Initialize SDL2
     let sdl2_context = sdl2::init().unwrap();
+    let mut sdl2_events = sdl2_context.event_pump().unwrap();
 
     let sdl2_video = sdl2_context.video().unwrap();
     let window = emulator.display.create_window(& sdl2_video);
     let mut renderer =  window.renderer().build().unwrap();
 
-    let mut sdl2_events = sdl2_context.event_pump().unwrap();
-
+    let sdl2_timing = sdl2_context.timer().unwrap();
   
-    //let mut last_frame = sdl2::
-    let mut iteration: u64 = 0;
+    // Game loop
+    let mut last_step_time = get_time(&sdl2_timing);
 
     'running: loop {
+        let processing_start = get_time(&sdl2_timing);
+
         // Events
         for event in sdl2_events.poll_iter() {
             match event {
@@ -76,10 +76,18 @@ fn main() {
         }
 
         // Emulation
-        // TODO: Use real synchronisation
-        emulator.step(1.0 / 60.0, &mut renderer, debug_cpu, debug_memory);
-        thread::sleep(Duration::from_millis(16));
+        let delta_time = (get_time(&sdl2_timing) - last_step_time) * 1000 / sdl2_timing.performance_frequency();
+        emulator.step(delta_time as f32, &mut renderer, debug_cpu, debug_memory);
 
-        iteration += 1;
+        let frame_wait_duration = 1.0 / emulator.get_cpu_clock_rate() * 1000.0;
+        let processing_time = (get_time(&sdl2_timing) - processing_start) * 1000 / sdl2_timing.performance_frequency();
+        let sleep_time = std::cmp::max(frame_wait_duration as u32 - processing_time as u32, 0);
+
+        last_step_time = get_time(&sdl2_timing);
+        thread::sleep(Duration::new(0, sleep_time * 1000000));
     }
+}
+
+fn get_time(sdl2_timing: &sdl2::TimerSubsystem) -> u64 {
+    sdl2_timing.performance_counter()
 }

@@ -133,32 +133,32 @@ impl Cpu {
     pub fn step(
         &mut self, memory: &mut Memory, keypad: &mut Keypad, display: &mut Display,
         delta_time: f32, debug_cpu: bool, debug_memory: bool) {
-        let instructions_to_execute = (delta_time * self.clock_rate).round() as usize;
-        let delta_time_per_instruction = delta_time / instructions_to_execute as f32;
 
-        for _ in 0..instructions_to_execute {
-            // Fetch opcode
-            self.opcode = (memory.read(self.pc) as u16) << 8 | (memory.read(self.pc + 1) as u16);
+        // Fetch opcode
+        self.opcode = (memory.read(self.pc) as u16) << 8 | (memory.read(self.pc + 1) as u16);
 
-            // Debugging
-            if debug_cpu && debug_memory {
-                println!("");            
-            }
-
-            if debug_cpu {
-                self.print_debug_info();
-            }
-            if debug_memory {
-                memory.print_debug_info();
-            }
-
-            // Execute opcode
-            self.execute_instruction(memory, keypad, display);
-
-            // Periodic tasks
-            self.update_delay_timer(delta_time_per_instruction);
-            self.update_sound_timer(delta_time_per_instruction);
+        // Debugging
+        if debug_cpu && debug_memory {
+            println!("");            
         }
+
+        if debug_cpu {
+            self.print_debug_info();
+        }
+        if debug_memory {
+            memory.print_debug_info();
+        }
+
+        // Execute opcode
+        self.execute_instruction(memory, keypad, display);
+
+        // Periodic tasks
+        self.update_delay_timer(delta_time);
+        self.update_sound_timer(delta_time);
+    }
+
+    pub fn get_clock_rate(&self) -> f32 {
+        self.clock_rate
     }
 
     pub fn print_debug_info(&self) {
