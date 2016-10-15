@@ -501,11 +501,11 @@ impl Cpu {
             _  => {
                 // opcode "SYS" is intentionally not implemented
                 if self.ignore_unknown_instructions {
-                    println!("opcode not implemented. opcode: {opcode}, program counter: {program_counter}",
+                    println!("instruction not implemented. opcode: {opcode}, program counter: {program_counter}",
                              opcode = self.opcode, program_counter = self.pc);
                 }
                 else {
-                    panic!("opcode not implemented. opcode: {opcode}, program counter: {program_counter}",
+                    panic!("instruction not implemented. opcode: {opcode}, program counter: {program_counter}",
                            opcode = self.opcode, program_counter = self.pc);
                 }
             }

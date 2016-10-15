@@ -19,7 +19,7 @@ args:
         takes_value: true
     - ignore_unknown_instructions:
         long: ignore-unknown-instructions
-        help: Clockrate of the CPU
+        help: CPU ignores unknown instructions
     - program_address:
         short: p
         long: program-address
