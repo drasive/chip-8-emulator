@@ -79,9 +79,14 @@ fn main() {
         let delta_time = (get_time(&sdl2_timing) - last_step_time) * 1000 / sdl2_timing.performance_frequency();
         emulator.step(delta_time as f32, &mut renderer, debug_cpu, debug_memory);
 
-        let frame_wait_duration = 1.0 / emulator.get_cpu_clock_rate() * 1000.0;
+        let frame_wait_duration = 1.0 / emulator.cpu.get_clock_rate() * 1000.0;
         let processing_time = (get_time(&sdl2_timing) - processing_start) * 1000 / sdl2_timing.performance_frequency();
-        let sleep_time = std::cmp::max(frame_wait_duration as u32 - processing_time as u32, 0);
+        let sleep_time = if frame_wait_duration as u32 > processing_time as u32 {
+            frame_wait_duration as u32 - processing_time as u32
+        }
+        else {
+            0
+        };
 
         last_step_time = get_time(&sdl2_timing);
         thread::sleep(Duration::new(0, sleep_time * 1000000));
