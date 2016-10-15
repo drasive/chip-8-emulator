@@ -438,6 +438,7 @@ impl Cpu {
                 // DT is set equal to the value of Vx.
 
                 self.delay_timer = self.v[x];
+                self.delay_timer_f = self.delay_timer as f32;
 
                 self.pc += 2;
             }
@@ -446,6 +447,7 @@ impl Cpu {
                 // ST is set equal to the value of Vx.
 
                 self.sound_timer = self.v[x];
+                self.sound_timer_f = self.sound_timer as f32;
 
                 self.pc += 2;
             }
@@ -514,14 +516,22 @@ impl Cpu {
 
     fn update_delay_timer(&mut self, delta_time: f32) {
         if self.delay_timer_f > 0.0 {
-            self.delay_timer_f -= delta_time * 60.0;
+            self.delay_timer_f -= delta_time / 1000.0 / (1.0 / 60.0);
+            if self.delay_timer_f < 0.0 {
+                self.delay_timer_f = 0.0;
+            }
+
             self.delay_timer = self.delay_timer_f.floor() as u8;
         }
     }
 
     fn update_sound_timer(&mut self, delta_time: f32) {
         if self.sound_timer_f > 0.0 {
-            self.sound_timer_f -= delta_time * 60.0;
+            self.sound_timer_f -= delta_time / 1000.0 / (1.0 / 60.0);
+            if self.sound_timer_f < 0.0 {
+                self.sound_timer_f = 0.0;
+            }
+
             self.sound_timer = self.sound_timer_f.floor() as u8;
             if self.sound_timer == 0 {
                 // TODO: Play beep sound
