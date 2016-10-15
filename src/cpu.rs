@@ -162,8 +162,9 @@ impl Cpu {
     }
 
     pub fn print_debug_info(&self) {
-        println!("\nOpcode: 0x{:X}, PC: {}, I: 0x{:X}, DT: {}, ST: {}",
-                 self.opcode, self.pc, self.i, self.delay_timer, self.sound_timer);
+        let opname = Cpu::get_opname(&self.opcode);
+        println!("\nOp: 0x{:X} {}, PC: {}, I: 0x{:X}, DT: {}, ST: {}",
+                 self.opcode, opname, self.pc, self.i, self.delay_timer, self.sound_timer);
 
         println!("Registers: {:?}", self.v);
         println!("Stack: {:?}", self.stack);
@@ -190,7 +191,7 @@ impl Cpu {
                 // then subtracts 1 from the stack pointer.
 
                 self.pc = self.stack[self.sp as usize ] as usize;
-                self.sp -= 1; // TODO: Move up a line?
+                self.sp -= 1;
 
                 self.pc += 2;
             }
@@ -206,7 +207,7 @@ impl Cpu {
                 // The interpreter increments the stack pointer, then puts the current PC on the top of the stack.
                 // The PC is then set to nnn.
 
-                self.sp += 1; // TODO: Move down a line?
+                self.sp += 1;
                 self.stack[self.sp as usize] = self.pc as usize;
                 self.pc = self.op_0fff();
             }
@@ -336,7 +337,7 @@ impl Cpu {
                 // If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
 
                 self.v[x] <<= 1;
-                self.v[0xF] = (self.v[x] >> 7) & 0x1; // "& 0x1" needed?                
+                self.v[0xF] = (self.v[x] >> 7) & 0x1;
 
                 self.pc += 2;
             }
@@ -547,6 +548,53 @@ impl Cpu {
 
     fn op_0fff(&mut self) -> usize {
         self.opcode as usize & 0x0FFF
+    }
+
+
+    fn get_opname(opcode: & u16) -> &str {
+        let byte_1 = (opcode & 0xF000) >> 0xC;
+        let byte_2 = ((opcode & 0x0F00) >> 0x8) as usize;
+        let byte_3 = ((opcode & 0x00F0) >> 0x4) as usize;
+        let byte_4 = opcode & 0x000F;
+
+        match (byte_1, byte_2, byte_3, byte_4) {
+            (0x0, 0x0, 0xE, 0x0) => "CLS",
+            (0x0, 0x0, 0xE, 0xE) => "RET",
+            (0x0, _, _, _) => "SYS",
+            (0x1, _, _, _) => "JP (addr)",
+            (0x2, _, _, _) => "CALL (addr)",
+            (0x3, _, _, _) => "SE (Vx, byte)",
+            (0x4, _, _, _) => "SNE (Vx, byte)",
+            (0x5, _, _, 0x0) => "SE (Vx, Vy)",
+            (0x6, _, _, _) => "LD (Vx, byte)",
+            (0x7, _, _, _) => "ADD (Vx, byte)",
+            (0x8, _, _, 0x0) => "LD (Vx, Vy)",
+            (0x8, _, _, 0x1) => "OR (Vx, Vy)",
+            (0x8, _, _, 0x2) => "AND (Vx, Vy)",
+            (0x8, _, _, 0x3) => "XOR (Vx, Vy)",
+            (0x8, _, _, 0x4) => "ADD (Vx, Vy)",
+            (0x8, _, _, 0x5) => "SUB (Vx, Vy)",
+            (0x8, _, _, 0x6) => "SHR (Vx, Vy)",
+            (0x8, _, _, 0x7) => "SUBN (Vy, Vy)",
+            (0x8, _, _, 0xE) => "SHL (Vx, Vy)",
+            (0x9, _, _, 0x0) => "SNE (Vy, Vy)",
+            (0xA, _, _, _) => "LD (I, addr)",
+            (0xB, _, _, _) => "JP (V0, addr)",
+            (0xC, _, _, _) => "RND (Vy, byte)",
+            (0xD, _, _, _) => "DRW (Vx, Vy, nibble)",
+            (0xE, _, 0x9, 0xE) => "SKP (Vx)",
+            (0xE, _, 0xA, 0x1) => "SKNP (Vx)",
+            (0xF, _, 0x0, 0x7) => "LD (Vx, DT)",
+            (0xF, _, 0x0, 0xA) => "LD (Vx, K)",
+            (0xF, _, 0x1, 0x5) => "LD (DT, Vx)",
+            (0xF, _, 0x1, 0x8) => "LD (ST, Vx)",
+            (0xF, _, 0x1, 0xE) => "ADD (I, Vx)",
+            (0xF, _, 0x2, 0x9) => "LD (F, Vx)",
+            (0xF, _, 0x3, 0x3) => "LB (B, Vx)",
+            (0xF, _, 0x5, 0x5) => "LD (I, Vx)",
+            (0xF, _, 0x6, 0x5) => "LD (Vx, I)",
+            _  => "?"
+        }
     }
     
 }

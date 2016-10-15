@@ -3,16 +3,16 @@
 An emulator for the Chip-8 programming language.  
 
 *Alpha Software: Not all components are fully implemented and bug-free.  
-It can run Chip-8 program "IBM" but not yet "Pong".*
+It can only run a small subset of Chip-8 programs correctly.*
 
 ## Features
-- Supports all 35 instructions (excluding the deprecated SYS 0NNN)
+- Supports all 35 instructions (excluding the deprecated SYS)
 - Includes GUI and keyboard support
 - Synchronized emulation for stable execution speed
 - Cross plattform support (Windows, Linux, Mac)
 
 ## TODO
-- Get Pong working
+- Get most programs working
 - Implement sound
 - Support variable display and memory sizes
 
