@@ -66,8 +66,11 @@ impl Display {
     pub fn draw(&mut self, renderer: &mut sdl2::render::Renderer) {
     	for x in 0..DISPLAY_WIDTH {
     		for y in 0..DISPLAY_HEIGHT {
-    			let color = if self.pixels[x as usize][y as usize] { 0 } else { 255 };
-    			renderer.set_draw_color(Color::RGB(color, color, color));
+    			if self.pixels[x as usize][y as usize] { 
+					renderer.set_draw_color(Color::RGB(109, 170, 44));
+				} else {
+					renderer.set_draw_color(Color::RGB(2, 95, 95));
+				}
 
     			renderer.fill_rect(Rect::new(
 					x as i32 * self.display_scale as i32 , y as i32 * self.display_scale as i32 ,
