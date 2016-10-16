@@ -34,14 +34,14 @@ impl Emulator {
             display: Display::new(display_scale),
             speaker: Speaker::new(),
 
-            iteration: 0
+            iteration: 1
         }
     }
 
 
     // Methods
     pub fn load_rom(&mut self, reader: &mut Read) -> Result<usize, Error> {
-        self.iteration = 0;
+        self.iteration = 1;
         self.keypad.reset();
         self.display.clear();
         self.speaker.clear_queue();
@@ -50,17 +50,21 @@ impl Emulator {
     }
 
     pub fn step(&mut self, delta_time: f32, mut renderer: &mut sdl2::render::Renderer, sdl2_audio: &sdl2::AudioSubsystem, debug_cpu: bool, debug_memory: bool) {
+        // Debugging
         if debug_cpu || debug_memory {
             println!("\nIteration #{}", self.iteration);
         }
 
+        // CPU
         self.cpu.step(delta_time, &mut self.memory, &mut self.keypad, &mut self.display, &mut self.speaker, debug_cpu, debug_memory);
 
-        if self.display.needs_redraw() || self.iteration == 0 {
+        // Other devices
+        if self.display.needs_redraw() || self.iteration == 1 {
             self.display.draw(&mut renderer);
         }
 
         self.speaker.flush_queue(sdl2_audio);
+
 
         self.iteration += 1;
     }
