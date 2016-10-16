@@ -50,6 +50,10 @@ impl Emulator {
     }
 
     pub fn step(&mut self, delta_time: f32, mut renderer: &mut sdl2::render::Renderer, sdl2_audio: &sdl2::AudioSubsystem, debug_cpu: bool, debug_memory: bool) {
+        if debug_cpu || debug_memory {
+            println!("\nIteration #{}", self.iteration);
+        }
+
         self.cpu.step(delta_time, &mut self.memory, &mut self.keypad, &mut self.display, &mut self.speaker, debug_cpu, debug_memory);
 
         if self.display.needs_redraw() || self.iteration == 0 {

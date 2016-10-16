@@ -140,10 +140,6 @@ impl Cpu {
         self.opcode = (memory.read(self.pc) as u16) << 8 | (memory.read(self.pc + 1) as u16);
 
         // Debugging
-        if debug_cpu && debug_memory {
-            println!("");            
-        }
-
         if debug_cpu {
             self.print_debug_info();
         }
@@ -165,7 +161,7 @@ impl Cpu {
 
     pub fn print_debug_info(&self) {
         let opname = Cpu::get_opname(&self.opcode);
-        println!("\nOp: 0x{:X} {}, PC: {}, I: 0x{:X}, DT: {}, ST: {}",
+        println!("Op: 0x{:X} {}, PC: {}, I: 0x{:X}, DT: {}, ST: {}",
                  self.opcode, opname, self.pc, self.i, self.delay_timer, self.sound_timer);
 
         println!("Registers: {:?}", self.v);
