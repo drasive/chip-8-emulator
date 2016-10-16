@@ -6,6 +6,7 @@ use std::io::{Read, Write, BufWriter, Error};
 use memory::Memory;
 use keypad::Keypad;
 use display::Display;
+use speaker::Speaker;
 
 
 // Font data
@@ -131,8 +132,9 @@ impl Cpu {
     }
 
     pub fn step(
-        &mut self, memory: &mut Memory, keypad: &mut Keypad, display: &mut Display,
-        delta_time: f32, debug_cpu: bool, debug_memory: bool) {
+        &mut self, delta_time: f32,
+        memory: &mut Memory, keypad: &mut Keypad, display: &mut Display, speaker: &mut Speaker,
+        debug_cpu: bool, debug_memory: bool) {
 
         // Fetch opcode
         self.opcode = (memory.read(self.pc) as u16) << 8 | (memory.read(self.pc + 1) as u16);
@@ -154,7 +156,7 @@ impl Cpu {
 
         // Periodic tasks
         self.update_delay_timer(delta_time);
-        self.update_sound_timer(delta_time);
+        self.update_sound_timer(delta_time, speaker);
     }
 
     pub fn get_clock_rate(&self) -> f32 {
@@ -526,16 +528,16 @@ impl Cpu {
         }
     }
 
-    fn update_sound_timer(&mut self, delta_time: f32) {
+    fn update_sound_timer(&mut self, delta_time: f32, speaker: &mut Speaker) {
         if self.sound_timer_f > 0.0 {
             self.sound_timer_f -= delta_time / 1000.0 / (1.0 / 60.0);
             if self.sound_timer_f < 0.0 {
                 self.sound_timer_f = 0.0;
             }
 
-            self.sound_timer = self.sound_timer_f.floor() as u8;
+            self.sound_timer = self.sound_timer_f.ceil() as u8;
             if self.sound_timer == 0 {
-                // TODO: Play beep sound
+                speaker.queue_beep();
             }
         }
     }

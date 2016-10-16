@@ -6,6 +6,7 @@ use cpu::Cpu;
 use memory::Memory;
 use keypad::Keypad;
 use display::Display;
+use speaker::Speaker;
 
 
 pub struct Emulator {
@@ -13,6 +14,7 @@ pub struct Emulator {
     pub memory: Memory,    
     pub keypad: Keypad,
     pub display: Display,
+    pub speaker: Speaker,
 
     iteration: u64
 }
@@ -30,6 +32,7 @@ impl Emulator {
             memory: Memory::new(),
             keypad: Keypad::new(),
             display: Display::new(display_scale),
+            speaker: Speaker::new(),
 
             iteration: 0
         }
@@ -41,16 +44,19 @@ impl Emulator {
         self.iteration = 0;
         self.keypad.reset();
         self.display.clear();
+        self.speaker.clear_queue();
 
         self.cpu.load_rom(&mut self.memory, reader)
     }
 
-    pub fn step(&mut self, delta_time: f32, mut renderer: &mut sdl2::render::Renderer, debug_cpu: bool, debug_memory: bool) {
-        self.cpu.step(&mut self.memory, &mut self.keypad, &mut self.display, delta_time, debug_cpu, debug_memory);
+    pub fn step(&mut self, delta_time: f32, mut renderer: &mut sdl2::render::Renderer, sdl2_audio: &sdl2::AudioSubsystem, debug_cpu: bool, debug_memory: bool) {
+        self.cpu.step(delta_time, &mut self.memory, &mut self.keypad, &mut self.display, &mut self.speaker, debug_cpu, debug_memory);
 
         if self.display.needs_redraw() || self.iteration == 0 {
             self.display.draw(&mut renderer);
         }
+
+        self.speaker.flush_queue(sdl2_audio);
 
         self.iteration += 1;
     }

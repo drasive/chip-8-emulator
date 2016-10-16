@@ -13,7 +13,6 @@ It can only run a small subset of Chip-8 programs correctly.*
 
 ## TODO
 - Get most programs working
-- Implement sound
 - Support variable display and memory sizes
 
 ## Development Dependencies
