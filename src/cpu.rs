@@ -392,7 +392,7 @@ impl Cpu {
                 // Checks the keyboard, and if the key corresponding to the value of Vx is currently in the down position,
                 // PC is increased by 2.
 
-                if !keypad.get_key(x as u8) {
+                if keypad.get_key(x as u8) {
                     self.pc += 2 * 2;
                 }
                 else {
@@ -404,7 +404,7 @@ impl Cpu {
                 // Checks the keyboard, and if the key corresponding to the value of Vx is currently in the up position,
                 // PC is increased by 2.
 
-                if keypad.get_key(x as u8) {
+                if !keypad.get_key(x as u8) {
                     self.pc += 2 * 2;
                 }
                 else {
