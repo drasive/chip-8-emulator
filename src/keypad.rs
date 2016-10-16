@@ -46,26 +46,26 @@ impl Keypad {
     // Helpers
     fn map_key(keycode: Keycode) -> Option<u8> {
     	match keycode {
-    		Keycode::Num1 => Some(0x1), // Key "1"
-    		Keycode::Num2 => Some(0x2), // Key "2"
-    		Keycode::Num3 => Some(0x3), // Key "3"
-    		Keycode::Num4 => Some(0xC), // Key "C"
+    		Keycode::Num1 => Some(0x1),
+    		Keycode::Num2 => Some(0x2),
+    		Keycode::Num3 => Some(0x3),
+    		Keycode::Num4 => Some(0xC),
 
-    		Keycode::Q =>    Some(0x4), // Key "4"
-    		Keycode::W =>    Some(0x5), // Key "5"
-    		Keycode::E =>    Some(0x6), // Key "6"
-    		Keycode::R =>    Some(0xD), // Key "D"
+    		Keycode::Q =>    Some(0x4),
+    		Keycode::W =>    Some(0x5),
+    		Keycode::E =>    Some(0x6),
+    		Keycode::R =>    Some(0xD),
 
-    		Keycode::A =>    Some(0x7), // Key "7"
-    		Keycode::S =>    Some(0x8), // Key "8"
-    		Keycode::D =>    Some(0x9), // Key "9"
-    		Keycode::F =>    Some(0xE), // Key "E"
+    		Keycode::A =>    Some(0x7),
+    		Keycode::S =>    Some(0x8),
+    		Keycode::D =>    Some(0x9),
+    		Keycode::F =>    Some(0xE),
 
     		Keycode::Y |
-    		Keycode::Z =>    Some(0xA), // Key "A"
-    		Keycode::X =>    Some(0x0), // Key "0"
-    		Keycode::C =>    Some(0xB), // Key "B"
-    		Keycode::V =>    Some(0xF), // Key "F"
+    		Keycode::Z =>    Some(0xA),
+    		Keycode::X =>    Some(0x0),
+    		Keycode::C =>    Some(0xB),
+    		Keycode::V =>    Some(0xF),
 
     		_          =>    None
     	}

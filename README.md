@@ -7,7 +7,7 @@ It can only run a small subset of Chip-8 programs correctly.*
 
 ## Features
 - Supports all 35 instructions (excluding the deprecated SYS)
-- Includes GUI and keyboard support
+- Includes GUI, keyboard and sound support
 - Synchronized emulation for stable execution speed
 - Cross plattform support (Windows, Linux, Mac)
 

@@ -33,6 +33,8 @@ impl Speaker {
 
     // Constructors
     pub fn new() -> Speaker {
+        println!("Initializing speaker");
+
         Speaker {
             play_beep: false
         }

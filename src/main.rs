@@ -47,7 +47,10 @@ fn main() {
         clock_rate, ignore_unknown_instructions, program_address,
         display_scale);
 
-	let mut rom_file = File::open(&Path::new(rom)).unwrap();
+	let mut rom_file = match File::open(&Path::new(rom)) {
+        Ok(rom_file) => rom_file,
+        Err(_) => panic!("The specified ROM file does not exist")
+    };
 	emulator.load_rom(&mut rom_file).unwrap();
     
 	// Initialize SDL2
