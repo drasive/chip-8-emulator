@@ -188,7 +188,7 @@ impl Cpu {
                 // The interpreter sets the program counter to the address at the top of the stack,
                 // then subtracts 1 from the stack pointer.
 
-                self.pc = self.stack[self.sp as usize ] as usize;
+                self.pc = self.stack[self.sp as usize] as usize;
                 self.sp -= 1;
 
                 self.pc += 2;
@@ -297,7 +297,7 @@ impl Cpu {
 
                 let (result, flag) = self.v[x].overflowing_add(self.v[y]);
                 self.v[x] = result as u8;
-                self.v[0xF] = if flag { 0 } else { 1 };
+                self.v[0xF] = if flag { 1 } else { 0 };
 
                 self.pc += 2;
             }
@@ -305,9 +305,13 @@ impl Cpu {
                 // 8xy5 - SUB Vx, Vy; Set Vx = Vx - Vy, set VF = NOT borrow.
                 // If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the results stored in Vx.
 
-                let (result, flag) = self.v[x].overflowing_sub(self.v[y]);
-                self.v[x] = result as u8;
-                self.v[0xF] = if flag { 0 } else { 1 };
+                if self.v[x] > self.v[y] {
+                    self.v[0xF] = 1;
+                }
+                else {
+                    self.v[0xF] = 0;
+                }
+                self.v[x] = self.v[x].wrapping_sub(self.v[y]);
 
                 self.pc += 2;
             }
@@ -315,27 +319,31 @@ impl Cpu {
                 // 8xy6 - SHR Vx {, Vy}; Set Vx = Vx SHR 1.
                 // If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is divided by 2.
 
+                self.v[0xF] = self.v[x] & 0x1;
                 self.v[x] >>= 1;
-                self.v[0xF] = self.v[x] & 0x1;                
 
                 self.pc += 2;
             }
             (0x8, x, y, 0x7) => {
                 // 8xy7 - SUBN Vx, Vy; Set Vx = Vy - Vx, set VF = NOT borrow.
                 // If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and the results stored in Vx.
-
-                let (result, flag) = self.v[y].overflowing_sub(self.v[x]);
-                self.v[x] = result as u8;
-                self.v[0xF] = if flag { 0 } else { 1 };
+                
+                if self.v[y] > self.v[x] {
+                    self.v[0xF] = 1;
+                }
+                else {
+                    self.v[0xF] = 0;
+                }
+                self.v[x] = self.v[y].wrapping_sub(self.v[x]);
 
                 self.pc += 2;
             }
             (0x8, x, _, 0xE) => {
                 // 8xyE - SHL Vx {, Vy}; Set Vx = Vx SHL 1.
                 // If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
-
-                self.v[x] <<= 1;
+               
                 self.v[0xF] = (self.v[x] >> 7) & 0x1;
+                self.v[x] <<= 1;
 
                 self.pc += 2;
             }
@@ -368,6 +376,10 @@ impl Cpu {
                 // Cxkk - RND Vx, byte; Set Vx = random byte AND kk.
                 // The interpreter generates a random number from 0 to 255, which is then ANDed with the value kk.
                 // The results are stored in Vx.
+
+                // TODO: Use caching
+                // Init once: let mut rng = rand::thread_rng();
+                // Use: rng.gen::<u8>()
 
                 self.v[x] = self.op_00ff() as u8 & rand::random::<u8>();
 
@@ -423,7 +435,7 @@ impl Cpu {
                 // Fx0A - LD Vx, K; Wait for a key press, store the value of the key in Vx.
                 // All execution stops until a key is pressed, then the value of that key is stored in Vx.
 
-                for index in 0..15 {
+                for index in 0x0..0xF {
                     if keypad.get_key(index) {
                         self.v[x] = index;
 
