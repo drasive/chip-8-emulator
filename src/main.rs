@@ -62,7 +62,7 @@ fn main() {
     let sdl2_audio = sdl2_context.audio().unwrap();
 
     let sdl2_video = sdl2_context.video().unwrap();
-    let window = emulator.display.create_window(& sdl2_video);
+    let window = emulator.display.create_window(&sdl2_video, rom);
     let mut renderer =  window.renderer().build().unwrap();
   
     // Game loop

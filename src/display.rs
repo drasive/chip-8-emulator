@@ -35,9 +35,11 @@ impl Display {
 
 
     // Methods
-	pub fn create_window(&self, sdl_video: & sdl2::VideoSubsystem) -> sdl2::video::Window {
+	pub fn create_window(&self, sdl_video: & sdl2::VideoSubsystem, title_addition: &str) -> sdl2::video::Window {
+		let title = format!("Chip-8 Emulator ({})", title_addition);
+
 		sdl_video.window(
-			"Chip-8 Emulator",
+			&title,
 			DISPLAY_WIDTH as u32 * self.display_scale as u32,
 			DISPLAY_HEIGHT as u32 * self.display_scale as u32)
 			.position_centered().opengl().build().unwrap()
