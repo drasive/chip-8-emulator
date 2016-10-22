@@ -32,8 +32,9 @@ fn main() {
     let ignore_unknown_instructions = parameters.is_present("ignore_unknown_instructions");
     let program_address = value_t!(parameters, "program_address", usize).unwrap();
     let display_scale = value_t!(parameters, "display_scale", u8).unwrap();
+    let sound = parameters.is_present("sound");
     let debug_cpu = parameters.is_present("debug_cpu");
-    let debug_memory = parameters.is_present("debug_memory");
+    let debug_memory = parameters.is_present("debug_memory");    
 
     if clock_rate <= 0.0 {
         panic!("parameter \"clock_rate\" must be > 0");
@@ -82,7 +83,7 @@ fn main() {
 
         // Emulation
         let delta_time = (get_time(&sdl2_timing) - last_step_time) * 1000 / sdl2_timing.performance_frequency();
-        emulator.step(delta_time as f32, &mut renderer, &sdl2_audio, debug_cpu, debug_memory);
+        emulator.step(delta_time as f32, &mut renderer, &sdl2_audio, sound, debug_cpu, debug_memory);
 
         let frame_wait_duration = 1.0 / emulator.cpu.get_clock_rate() * 1000.0;
         let processing_time = (get_time(&sdl2_timing) - processing_start) * 1000 / sdl2_timing.performance_frequency();

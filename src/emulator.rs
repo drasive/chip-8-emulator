@@ -49,7 +49,7 @@ impl Emulator {
         self.cpu.load_rom(&mut self.memory, reader)
     }
 
-    pub fn step(&mut self, delta_time: f32, mut renderer: &mut sdl2::render::Renderer, sdl2_audio: &sdl2::AudioSubsystem, debug_cpu: bool, debug_memory: bool) {
+    pub fn step(&mut self, delta_time: f32, mut renderer: &mut sdl2::render::Renderer, sdl2_audio: &sdl2::AudioSubsystem, sound: bool, debug_cpu: bool, debug_memory: bool) {
         // Debugging
         if debug_cpu || debug_memory {
             println!("\nIteration #{}", self.iteration);
@@ -63,7 +63,9 @@ impl Emulator {
             self.display.draw(&mut renderer);
         }
 
-        self.speaker.flush_queue(sdl2_audio);
+        if sound {
+            self.speaker.flush_queue(sdl2_audio);
+        }
 
 
         self.iteration += 1;

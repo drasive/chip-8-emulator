@@ -34,6 +34,9 @@ args:
         help: Scaling factor for pixels
         default_value: "10"
         takes_value: true
+    - sound:
+        long: sound
+        help: Play beep sounds (short freezes)
     - debug_cpu:
         long: debug-cpu
         help: Print CPU debug info
