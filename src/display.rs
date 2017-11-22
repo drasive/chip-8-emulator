@@ -1,5 +1,6 @@
 extern crate sdl2;
 
+use sdl2::video::Window;
 use sdl2::rect::Rect;
 use sdl2::pixels::Color;
 
@@ -65,7 +66,7 @@ impl Display {
     	collision
     }
 
-    pub fn draw(&mut self, renderer: &mut sdl2::render::Renderer) {
+    pub fn draw(&mut self, renderer: &mut sdl2::render::Canvas<Window>) {
     	for x in 0..DISPLAY_WIDTH {
     		for y in 0..DISPLAY_HEIGHT {
     			if self.pixels[x as usize][y as usize] { 
