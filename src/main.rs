@@ -63,7 +63,7 @@ fn main() {
 
     let sdl2_video = sdl2_context.video().unwrap();
     let window = emulator.display.create_window(&sdl2_video, rom);
-    let mut renderer =  window.renderer().build().unwrap();
+    let mut renderer =  window.into_canvas().build().unwrap();
   
     // Game loop
     let mut last_step_time = get_time(&sdl2_timing);
