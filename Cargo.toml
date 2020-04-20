@@ -5,8 +5,11 @@ edition = "2018"
 authors = ["Dimitri Vranken <me@dimitrivranken.com>"]
 
 [dependencies]
-rand = "^0"
-time = "^0"
 clap = { version = "^2", features = ["yaml"] }
-sdl2 = "^0"
+rand = "^0"
 rodio = "^0"
+sdl2 = "^0"
+time = "^0"
+
+[dev-dependencies]
+mockall = "^0"

@@ -1,5 +1,9 @@
 use sdl2::keyboard::Keycode;
 
+#[cfg(test)]
+use mockall::{automock, predicate::*};
+
+#[cfg_attr(test, automock)]
 pub trait KeypadTrait {
     fn get_key(&mut self, key: u8) -> bool;
     fn key_down(&mut self, keycode: Keycode);
