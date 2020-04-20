@@ -193,7 +193,6 @@ impl Cpu {
 
                 self.pc += 2;
             }
-
             (0x1, _, _, _) => {
                 // 1nnn - JP addr; Jump to location nnn.
                 // The interpreter sets the program counter to nnn.
@@ -213,7 +212,7 @@ impl Cpu {
                 // 3xkk - SE Vx, byte; Skip next instruction if Vx = kk.
                 // The interpreter compares register Vx to kk, and if they are equal, increments the program counter by 2.
 
-                if self.v[x] == self.op_00ff() as u8 {
+                if self.v[x] == self.op_00ff() {
                     self.pc += 2 * 2;
                 }
                 else {
@@ -224,7 +223,7 @@ impl Cpu {
                 // 4xkk - SNE Vx, byte; Skip next instruction if Vx != kk.
                 // The interpreter compares register Vx to kk, and if they are not equal, increments the program counter by 2.
 
-                if self.v[x] != self.op_00ff() as u8 {
+                if self.v[x] != self.op_00ff() {
                     self.pc += 2 * 2;
                 }
                 else {
@@ -246,7 +245,7 @@ impl Cpu {
                 // 6xkk - LD Vx, byte; Set Vx = kk.
                 // The interpreter puts the value kk into register Vx.
 
-                self.v[x] = self.op_00ff() as u8;
+                self.v[x] = self.op_00ff();
 
                 self.pc += 2;
             }
@@ -254,7 +253,7 @@ impl Cpu {
                 // 7xkk - ADD Vx, byte; Set Vx = Vx + kk.
                 // Adds the value kk to the value of register Vx, then stores the result in Vx. 
 
-                self.v[x] = self.v[x].wrapping_add(self.op_00ff() as u8);
+                self.v[x] = self.v[x].wrapping_add(self.op_00ff());
 
                 self.pc += 2;
             }
@@ -381,7 +380,7 @@ impl Cpu {
                 // Init once: let mut rng = rand::thread_rng();
                 // Use: rng.gen::<u8>()
 
-                self.v[x] = self.op_00ff() as u8 & rand::random::<u8>();
+                self.v[x] = self.op_00ff() & rand::random::<u8>();
 
                 self.pc += 2;
             }
@@ -552,12 +551,12 @@ impl Cpu {
     
 
     // Helpers
-    fn op_00ff(&mut self) -> usize {
-        self.opcode as usize & 0x00FF 
+    fn op_00ff(&mut self) -> u8 {
+        (self.opcode & 0x00FF) as u8
     }
 
     fn op_0fff(&mut self) -> usize {
-        self.opcode as usize & 0x0FFF
+        (self.opcode & 0x0FFF) as usize 
     }
 
 
