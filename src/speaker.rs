@@ -28,7 +28,7 @@ impl Speaker {
 
     pub fn flush_queue(&mut self) {
         if self.play_beep {
-            Speaker::play_sound("../resources/beep.wav");
+            Speaker::play_sound("resources/beep.wav");
 
             self.play_beep = false;
         }
