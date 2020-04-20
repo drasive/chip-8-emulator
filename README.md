@@ -17,7 +17,7 @@ It can only run a small subset of Chip-8 programs correctly.*
 
 ## Development Dependencies
 - Rust 1.12.0 (https://www.rust-lang.org/)
-- SDL 2.0.7 development libraries (http://www.libsdl.org/)
+- SDL 2.0.12 development libraries (http://www.libsdl.org/)
 
 ## License
 This project is licensed under the GNU GPL v3.0.  
