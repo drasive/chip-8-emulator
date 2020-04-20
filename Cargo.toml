@@ -8,3 +8,4 @@ rand = "^0"
 time = "^0"
 clap = { version = "^2", features = ["yaml"] }
 sdl2 = "^0"
+rodio = "^0"

@@ -59,7 +59,6 @@ fn main() {
 
     let mut sdl2_events = sdl2_context.event_pump().unwrap();
     let sdl2_timing = sdl2_context.timer().unwrap();
-    let sdl2_audio = sdl2_context.audio().unwrap();
 
     let sdl2_video = sdl2_context.video().unwrap();
     let window = emulator.display.create_window(&sdl2_video, rom);
@@ -83,7 +82,7 @@ fn main() {
 
         // Emulation
         let delta_time = (get_time(&sdl2_timing) - last_step_time) * 1000 / sdl2_timing.performance_frequency();
-        emulator.step(delta_time as f32, &mut renderer, &sdl2_audio, sound, debug_cpu, debug_memory);
+        emulator.step(delta_time as f32, &mut renderer, sound, debug_cpu, debug_memory);
 
         let frame_wait_duration = 1.0 / emulator.cpu.get_clock_rate() * 1000.0;
         let processing_time = (get_time(&sdl2_timing) - processing_start) * 1000 / sdl2_timing.performance_frequency();
