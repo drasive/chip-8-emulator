@@ -54,6 +54,10 @@ fn main() {
     };
 	emulator.load_rom(&mut rom_file).unwrap();
     
+    // Initialize rodeo
+    // This needs to be done before SDL2 initialization: https://github.com/RustAudio/rodio/issues/214
+    rodio::default_output_device();
+
 	// Initialize SDL2
     let sdl2_context = sdl2::init().unwrap();
 
