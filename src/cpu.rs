@@ -230,8 +230,6 @@ impl Cpu {
 
                 self.pc = self.stack[self.sp as usize] as usize;
                 self.sp -= 1;
-
-                self.pc += 2;
             }
             (0x1, _, _, _) => {
                 // 1nnn - JP addr; Jump to location nnn.
