@@ -34,7 +34,6 @@ impl Display {
         }
     }
 
-
     // Methods
     pub fn create_window(&self, sdl_video: & sdl2::VideoSubsystem, title_addition: &str) -> sdl2::video::Window {
         let title = format!("Chip-8 Emulator ({})", title_addition);
