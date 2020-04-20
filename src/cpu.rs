@@ -1,16 +1,15 @@
 extern crate rand;
 extern crate sdl2;
-extern crate mockall;
+//extern crate mockall;
 
-use std::io::{Read, Write, BufWriter, Error};
-use mockall::*;
-use mockall::predicate::*;
+use std::io::{BufWriter, Error, Read, Write};
+//use mockall::*;
+//use mockall::predicate::*;
 
-use memory::Memory;
-use keypad::Keypad;
-use display::Display;
-use speaker::Speaker;
-
+use display::DisplayTrait;
+use keypad::KeypadTrait;
+use memory::MemoryTrait;
+use speaker::SpeakerTrait;
 
 // Font data
 const FONT_WIDTH: usize = 5;
@@ -35,46 +34,150 @@ const FONT: [u8; FONT_BYTES] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
+pub trait CpuTrait {
+    fn load_rom(&mut self, memory: &mut dyn MemoryTrait, rom_reader: &mut dyn Read)
+        -> Result<usize, Error>;
+    fn step(
+        &mut self,
+        delta_time: f32,
+        memory: &mut dyn MemoryTrait,
+        keypad: &mut dyn KeypadTrait,
+        display: &mut dyn DisplayTrait,
+        speaker: &mut dyn SpeakerTrait,
+        debug_cpu: bool,
+        debug_memory: bool,
+    );
+    fn get_clock_rate(&self) -> f32;
+    fn print_debug_info(&self);
+}
 
 pub struct Cpu {
     // Program
     opcode: u16, // current opcode (two 8-bit values)
-    pc: usize, // 16-bit program counter
+    pc: usize,   // 16-bit program counter
 
     // Registers
     v: [u8; 16], // 16 8-bit general purpose registers
-    i: u16, // 16-bit register for storing memory adresses
+    i: u16,      // 16-bit register for storing memory adresses
 
-    delay_timer: u8, // 8-bit delay timer (decremented at 60 Hz)
+    delay_timer: u8,    // 8-bit delay timer (decremented at 60 Hz)
     delay_timer_f: f32, // float representation of delay_timer
-    sound_timer: u8, // 8-bit sound timer (decremented at 60 Hz)
+    sound_timer: u8,    // 8-bit sound timer (decremented at 60 Hz)
     sound_timer_f: f32, // float representation of sound_timer
 
     // Stack
     stack: [usize; 16], // 16 values to store return values of subroutines
-    sp: u8, // 8-bit register that points to the topmost level of the stack
+    sp: u8,             // 8-bit register that points to the topmost level of the stack
 
     // Configuration
     clock_rate: f32,
     ignore_unknown_instructions: bool,
-    program_address: usize
+    program_address: usize,
 }
 
-pub trait CpuTrait {
-    fn load_rom(&mut self, memory: &mut Memory, rom_reader: &mut Read) -> Result<usize, Error>;
+impl CpuTrait for Cpu {
+    fn load_rom(
+        &mut self,
+        memory: &mut dyn MemoryTrait,
+        rom_reader: &mut dyn Read,
+    ) -> Result<usize, Error> {
+        // Clear memory
+        memory.clear();
+
+        // Copy font to memory at 0x000
+        if FONT_BYTES > memory.get_size() {
+            panic!("Font size ({font_bytes} bytes) is larger than available memory ({memory_size} bytes)",
+                font_bytes = FONT_BYTES, memory_size = memory.get_size());
+        }
+
+        {
+            println!(
+                "Copying font ({font_bytes} bytes) to memory at 0x000",
+                font_bytes = FONT_BYTES
+            );
+            let mut memory_stream = BufWriter::new(&mut memory.get_cells()[0..FONT_BYTES]);
+            memory_stream.write_all(FONT.as_ref()).unwrap();
+        }
+
+        // Read ROM
+        println!("Reading ROM");
+        let mut rom = Vec::new();
+        try!(rom_reader.read_to_end(&mut rom));
+
+        // Copy ROM into memory
+        if rom.len() < 2 {
+            panic!("ROM does not contain any instructions");
+        } else if rom.len() > memory.get_size() - self.program_address {
+            panic!("ROM size ({rom_size} bytes) is larger than available program memory ({available_memory}) bytes)",
+                   rom_size = rom.len(), available_memory = memory.get_size() - self.program_address);
+        }
+        {
+            println!(
+                "Copying ROM ({rom_size} bytes) to memory at 0x{program_start:X}",
+                rom_size = rom.len(),
+                program_start = self.program_address
+            );
+            let mut memory_stream = BufWriter::new(
+                &mut memory.get_cells()[self.program_address..(self.program_address + rom.len())],
+            );
+            try!(memory_stream.write_all(rom.as_ref()));
+        }
+
+        self.pc = self.program_address;
+        return Ok(rom.len());
+    }
+
     fn step(
-        &mut self, delta_time: f32,
-        memory: &mut Memory, keypad: &mut Keypad, display: &mut Display, speaker: &mut Speaker,
-        debug_cpu: bool, debug_memory: bool);
-    fn execute_instruction(&mut self, memory: &mut Memory, keypad: &mut Keypad, display: &mut Display);
+        &mut self,
+        delta_time: f32,
+        memory: &mut dyn MemoryTrait,
+        keypad: &mut dyn KeypadTrait,
+        display: &mut dyn DisplayTrait,
+        speaker: &mut dyn SpeakerTrait,
+        debug_cpu: bool,
+        debug_memory: bool,
+    ) {
+        // Fetch opcode
+        self.opcode = (memory.read(self.pc) as u16) << 8 | (memory.read(self.pc + 1) as u16);
+
+        // Debugging
+        if debug_cpu {
+            self.print_debug_info();
+        }
+        if debug_memory {
+            memory.print_debug_info();
+        }
+
+        // Execute opcode
+        self.execute_instruction(memory, keypad, display);
+
+        // Periodic tasks
+        self.update_delay_timer(delta_time);
+        self.update_sound_timer(delta_time, speaker);
+    }
+
+    fn get_clock_rate(&self) -> f32 {
+        self.clock_rate
+    }
+
+    fn print_debug_info(&self) {
+        let opname = Cpu::get_opname(&self.opcode);
+        println!(
+            "Op: 0x{:X} {}, PC: {}, I: 0x{:X}, DT: {}, ST: {}",
+            self.opcode, opname, self.pc, self.i, self.delay_timer, self.sound_timer
+        );
+
+        println!("Registers: {:?}", self.v);
+        println!("Stack: {:?}", self.stack);
+    }
 }
 
-
-impl Cpu for CpuTrait {
-
-    // Constructors
+impl Cpu {
     pub fn new(clock_rate: f32, ignore_unknown_instructions: bool, program_address: usize) -> Cpu {
-        println!("Initializing processor with {clock_rate} Hz", clock_rate = clock_rate);
+        println!(
+            "Initializing processor with {clock_rate} Hz",
+            clock_rate = clock_rate
+        );
 
         Cpu {
             // Program
@@ -97,91 +200,16 @@ impl Cpu for CpuTrait {
             // Configuration
             clock_rate: clock_rate,
             ignore_unknown_instructions: ignore_unknown_instructions,
-            program_address: program_address
+            program_address: program_address,
         }
     }
 
-    // Methods
-    pub fn load_rom(&mut self, memory: &mut Memory, rom_reader: &mut Read) -> Result<usize, Error> {
-        // Clear memory
-        memory.clear();
-
-        // Copy font to memory at 0x000
-        if FONT_BYTES > memory.get_size() {
-            panic!("Font size ({font_bytes} bytes) is larger than available memory ({memory_size} bytes)",
-                font_bytes = FONT_BYTES, memory_size = memory.get_size());
-        }
-
-        {
-            println!("Copying font ({font_bytes} bytes) to memory at 0x000", font_bytes = FONT_BYTES);
-            let mut memory_stream = BufWriter::new(&mut memory.cells[0..FONT_BYTES]);
-            memory_stream.write_all(FONT.as_ref()).unwrap();
-        }
-
-        // Read ROM
-        println!("Reading ROM");
-        let mut rom = Vec::new();
-        try!(rom_reader.read_to_end(&mut rom));
-
-        // Copy ROM into memory
-        if rom.len() < 2 {
-            panic!("ROM does not contain any instructions");
-        }
-        else if rom.len() > memory.get_size() - self.program_address {
-            panic!("ROM size ({rom_size} bytes) is larger than available program memory ({available_memory}) bytes)",
-                   rom_size = rom.len(), available_memory = memory.get_size() - self.program_address);
-        }
-        
-        {
-            println!("Copying ROM ({rom_size} bytes) to memory at 0x{program_start:X}", rom_size = rom.len(), program_start = self.program_address);
-            let mut memory_stream = BufWriter::new(&mut memory.cells[self.program_address..(self.program_address + rom.len())]);
-            try!(memory_stream.write_all(rom.as_ref()));
-        }
-
-
-        self.pc = self.program_address;
-        return Ok(rom.len());
-    }
-
-    pub fn step(
-        &mut self, delta_time: f32,
-        memory: &mut Memory, keypad: &mut Keypad, display: &mut Display, speaker: &mut Speaker,
-        debug_cpu: bool, debug_memory: bool) {
-
-        // Fetch opcode
-        self.opcode = (memory.read(self.pc) as u16) << 8 | (memory.read(self.pc + 1) as u16);
-
-        // Debugging
-        if debug_cpu {
-            self.print_debug_info();
-        }
-        if debug_memory {
-            memory.print_debug_info();
-        }
-
-        // Execute opcode
-        self.execute_instruction(memory, keypad, display);
-
-        // Periodic tasks
-        self.update_delay_timer(delta_time);
-        self.update_sound_timer(delta_time, speaker);
-    }
-
-    pub fn get_clock_rate(&self) -> f32 {
-        self.clock_rate
-    }
-
-    pub fn print_debug_info(&self) {
-        let opname = Cpu::get_opname(&self.opcode);
-        println!("Op: 0x{:X} {}, PC: {}, I: 0x{:X}, DT: {}, ST: {}",
-                 self.opcode, opname, self.pc, self.i, self.delay_timer, self.sound_timer);
-
-        println!("Registers: {:?}", self.v);
-        println!("Stack: {:?}", self.stack);
-    }
-
-
-    fn execute_instruction(&mut self, memory: &mut Memory, keypad: &mut Keypad, display: &mut Display) {
+    fn execute_instruction(
+        &mut self,
+        memory: &mut dyn MemoryTrait,
+        keypad: &mut dyn KeypadTrait,
+        display: &mut dyn DisplayTrait,
+    ) {
         let byte_1 = (self.opcode & 0xF000) >> 0xC;
         let byte_2 = ((self.opcode & 0x0F00) >> 0x8) as usize;
         let byte_3 = ((self.opcode & 0x00F0) >> 0x4) as usize;
@@ -226,8 +254,7 @@ impl Cpu for CpuTrait {
 
                 if self.v[x] == self.op_00ff() {
                     self.pc += 2 * 2;
-                }
-                else {
+                } else {
                     self.pc += 2;
                 }
             }
@@ -237,8 +264,7 @@ impl Cpu for CpuTrait {
 
                 if self.v[x] != self.op_00ff() {
                     self.pc += 2 * 2;
-                }
-                else {
+                } else {
                     self.pc += 2;
                 }
             }
@@ -248,8 +274,7 @@ impl Cpu for CpuTrait {
 
                 if self.v[x] == self.v[y] {
                     self.pc += 2 * 2;
-                }
-                else {
+                } else {
                     self.pc += 2;
                 }
             }
@@ -263,7 +288,7 @@ impl Cpu for CpuTrait {
             }
             (0x7, x, _, _) => {
                 // 7xkk - ADD Vx, byte; Set Vx = Vx + kk.
-                // Adds the value kk to the value of register Vx, then stores the result in Vx. 
+                // Adds the value kk to the value of register Vx, then stores the result in Vx.
 
                 self.v[x] = self.v[x].wrapping_add(self.op_00ff());
 
@@ -289,9 +314,9 @@ impl Cpu for CpuTrait {
                 // 8xy2 - AOR Vx, Vy; Set Vx = Vx AND Vy.
                 // Performs a bitwise AND on the values of Vx and Vy, then stores the result in Vx.
 
-                self.v[x] &= self.v[y]; 
+                self.v[x] &= self.v[y];
 
-                self.pc += 2;      
+                self.pc += 2;
             }
             (0x8, x, y, 0x3) => {
                 // 8xy3 - XOR Vx, Vy; Set Vx = Vx XOR Vy.
@@ -318,8 +343,7 @@ impl Cpu for CpuTrait {
 
                 if self.v[x] > self.v[y] {
                     self.v[0xF] = 1;
-                }
-                else {
+                } else {
                     self.v[0xF] = 0;
                 }
                 self.v[x] = self.v[x].wrapping_sub(self.v[y]);
@@ -338,11 +362,9 @@ impl Cpu for CpuTrait {
             (0x8, x, y, 0x7) => {
                 // 8xy7 - SUBN Vx, Vy; Set Vx = Vy - Vx, set VF = NOT borrow.
                 // If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and the results stored in Vx.
-                
                 if self.v[y] > self.v[x] {
                     self.v[0xF] = 1;
-                }
-                else {
+                } else {
                     self.v[0xF] = 0;
                 }
                 self.v[x] = self.v[y].wrapping_sub(self.v[x]);
@@ -352,7 +374,6 @@ impl Cpu for CpuTrait {
             (0x8, x, _, 0xE) => {
                 // 8xyE - SHL Vx {, Vy}; Set Vx = Vx SHL 1.
                 // If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
-               
                 self.v[0xF] = (self.v[x] >> 7) & 0x1;
                 self.v[x] <<= 1;
 
@@ -364,8 +385,7 @@ impl Cpu for CpuTrait {
 
                 if self.v[x] != self.v[y] {
                     self.pc += 2 * 2;
-                }
-                else {
+                } else {
                     self.pc += 2;
                 }
             }
@@ -406,7 +426,11 @@ impl Cpu for CpuTrait {
 
                 let start = self.i as usize;
                 let end = self.i as usize + n as usize;
-                self.v[0xF] = display.draw_sprite(self.v[x] as usize, self.v[y] as usize, &memory.cells[start..end]);
+                self.v[0xF] = display.draw_sprite(
+                    self.v[x] as usize,
+                    self.v[y] as usize,
+                    &memory.get_cells()[start..end],
+                );
 
                 self.pc += 2;
             }
@@ -417,8 +441,7 @@ impl Cpu for CpuTrait {
 
                 if keypad.get_key(x as u8) {
                     self.pc += 2 * 2;
-                }
-                else {
+                } else {
                     self.pc += 2;
                 }
             }
@@ -429,12 +452,11 @@ impl Cpu for CpuTrait {
 
                 if !keypad.get_key(x as u8) {
                     self.pc += 2 * 2;
-                }
-                else {
+                } else {
                     self.pc += 2;
                 }
             }
-            (0xF, x, 0x0, 0x7) => {                
+            (0xF, x, 0x0, 0x7) => {
                 // Fx07 - LD Vx, DT; Set Vx = delay timer value.
                 // The value of DT is placed into Vx.
 
@@ -476,7 +498,6 @@ impl Cpu for CpuTrait {
             (0xF, x, 0x1, 0xE) => {
                 // Fx1E - ADD I, Vx; Set I = I + Vx.
                 // The values of I and Vx are added, and the results are stored in I.
-                
                 self.i += self.v[x] as u16;
 
                 self.pc += 2;
@@ -484,7 +505,6 @@ impl Cpu for CpuTrait {
             (0xF, x, 0x2, 0x9) => {
                 // Fx29 - LD F, Vx; Set I = location of sprite for digit Vx.
                 // The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx.
-                
                 self.i = self.v[x] as u16 * FONT_WIDTH as u16;
 
                 self.pc += 2;
@@ -493,7 +513,6 @@ impl Cpu for CpuTrait {
                 // Fx33 - LD B, Vx; Store BCD representation of Vx in memory locations I, I+1, and I+2.
                 // The interpreter takes the decimal value of Vx, and places the hundreds digit in memory at location in I,
                 // the tens digit at location I+1, and the ones digit at location I+2.
-                
                 memory.write(self.i as usize, self.v[x] / 100);
                 memory.write(self.i as usize + 1, (self.v[x] / 10) % 10);
                 memory.write(self.i as usize + 2, (self.v[x] % 100) & 10);
@@ -522,13 +541,12 @@ impl Cpu for CpuTrait {
 
                 self.pc += 2;
             }
-            _  => {
+            _ => {
                 // opcode "SYS" is intentionally not implemented
                 if self.ignore_unknown_instructions {
                     println!("instruction not implemented. opcode: {opcode}, program counter: {program_counter}",
                              opcode = self.opcode, program_counter = self.pc);
-                }
-                else {
+                } else {
                     panic!("instruction not implemented. opcode: {opcode}, program counter: {program_counter}",
                            opcode = self.opcode, program_counter = self.pc);
                 }
@@ -547,7 +565,7 @@ impl Cpu for CpuTrait {
         }
     }
 
-    fn update_sound_timer(&mut self, delta_time: f32, speaker: &mut Speaker) {
+    fn update_sound_timer(&mut self, delta_time: f32, speaker: &mut dyn SpeakerTrait) {
         if self.sound_timer_f > 0.0 {
             self.sound_timer_f -= delta_time / 1000.0 / (1.0 / 60.0);
             if self.sound_timer_f < 0.0 {
@@ -560,19 +578,16 @@ impl Cpu for CpuTrait {
             }
         }
     }
-    
 
-    // Helpers
     fn op_00ff(&mut self) -> u8 {
         (self.opcode & 0x00FF) as u8
     }
 
     fn op_0fff(&mut self) -> usize {
-        (self.opcode & 0x0FFF) as usize 
+        (self.opcode & 0x0FFF) as usize
     }
 
-
-    fn get_opname(opcode: & u16) -> &str {
+    fn get_opname(opcode: &u16) -> &str {
         let byte_1 = (opcode & 0xF000) >> 0xC;
         let byte_2 = ((opcode & 0x0F00) >> 0x8) as usize;
         let byte_3 = ((opcode & 0x00F0) >> 0x4) as usize;
@@ -614,10 +629,9 @@ impl Cpu for CpuTrait {
             (0xF, _, 0x3, 0x3) => "LD (B, Vx)",
             (0xF, _, 0x5, 0x5) => "LD (I, Vx)",
             (0xF, _, 0x6, 0x5) => "LD (Vx, I)",
-            _  => "?"
+            _ => "?",
         }
     }
-
 }
 
 #[cfg(test)]
@@ -625,49 +639,42 @@ mod tests {
     use super::*;
     use memory::*;
 
-    fn instantiate_cpu(&mut memory: Memory, rom_reader: &mut Read) -> cpu::Cpu {
-        let cpu = Cpu::new(600.0, false, 512);
-        cpu.load_rom(&mut memory, rom_reader);
+    fn instantiate_cpu(memory: &mut dyn MemoryTrait, rom_reader: &mut dyn Read) -> Cpu {
+        let mut cpu = Cpu::new(600.0, false, 512);
+        cpu.load_rom(memory, rom_reader);
         cpu
     }
 
-    fn instantiate_memory() -> memory::Memory {
-        Memory::new(); // Not mocked dued to simplicity
-    }
-
-    fn step(&mut cpu: Cpu, &mut memory: Memory) {
-        let keypad = Mock // TODO: _Mock
-
-        cpu.step(10.0, &mut memory,  )
+    fn instantiate_memory() -> Memory {
+        Memory::new() // Not mocked dued to simplicity
     }
 
     #[test]
     fn test_initial_state() {
-        let memory = instantiate_memory();
-        let cpu = instantiate_cpu(memory, vec![]);
-        
+        let mut memory = instantiate_memory();
+        let cpu = instantiate_cpu(&mut memory, &mut std::io::Cursor::new(vec![]));
+
         assert_eq!(cpu.pc, 0x200);
         assert_eq!(cpu.sp, 0);
         assert_eq!(cpu.stack, [0; 16]);
 
         // First char in font: 0
-        assert_eq!(memory.cells[0..5], [0xF0, 0x90, 0x90, 0x90, 0xF0]);
+        assert_eq!(memory.get_cells()[0..5], [0xF0, 0x90, 0x90, 0x90, 0xF0]);
 
         // Last char in font: F
         assert_eq!(
-            memory.cells[FONT.len() - 5..FONT.len()],
+            memory.get_cells()[FONT.len() - 5..FONT.len()],
             [0xF0, 0x80, 0xF0, 0x80, 0x80]
         );
     }
 
     #[test]
     fn test_load_data() {
-        let memory = instantiate_memory();
-        let cpu = instantiate_cpu(memory, vec![1, 2, 3]);
-        
-        assert_eq!(memory.cells[0x200], 1);
-        assert_eq!(memory.cells[0x201], 2);
-        assert_eq!(memory.cells[0x202], 3);
+        let mut memory = instantiate_memory();
+        let _ = instantiate_cpu(&mut memory, &mut std::io::Cursor::new(vec![1, 2, 3]));
+
+        assert_eq!(memory.get_cells()[0x200], 1);
+        assert_eq!(memory.get_cells()[0x201], 2);
+        assert_eq!(memory.get_cells()[0x202], 3);
     }
-    
 }
