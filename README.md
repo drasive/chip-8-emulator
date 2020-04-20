@@ -16,7 +16,7 @@ It can only run a small subset of Chip-8 programs correctly.*
 - Support variable display and memory sizes
 
 ## Development Dependencies
-- Rust 1.12.0 (https://www.rust-lang.org/)
+- Rust 1.36.0 (https://www.rust-lang.org/) or compatible
 - SDL 2.0.12 development libraries (http://www.libsdl.org/)
 
 ## License
