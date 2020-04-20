@@ -1,32 +1,25 @@
 extern crate rodio;
 
+use self::rodio::Source;
 use std::fs::File;
 use std::io::BufReader;
-use self::rodio::Source;
 
-
-
-pub struct Speaker {
-    play_beep: bool
+pub trait SpeakerTrait {
+    fn queue_beep(&mut self);
+    fn flush_queue(&mut self);
+    fn clear_queue(&mut self);
 }
 
-impl Speaker {
+pub struct Speaker {
+    play_beep: bool,
+}
 
-    // Constructors
-    pub fn new() -> Speaker {
-        println!("Initializing speaker");
-
-        Speaker {
-            play_beep: false
-        }
-    }
-
-    // Methods
-    pub fn queue_beep(&mut self) {
+impl SpeakerTrait for Speaker {
+    fn queue_beep(&mut self) {
         self.play_beep = true;
     }
 
-    pub fn flush_queue(&mut self) {
+    fn flush_queue(&mut self) {
         if self.play_beep {
             Speaker::play_sound("resources/beep.wav");
 
@@ -34,10 +27,17 @@ impl Speaker {
         }
     }
 
-    pub fn clear_queue(&mut self) {
+    fn clear_queue(&mut self) {
         self.play_beep = false;
     }
+}
 
+impl Speaker {
+    pub fn new() -> Speaker {
+        println!("Initializing speaker");
+
+        Speaker { play_beep: false }
+    }
 
     fn play_sound(file_name: &str) {
         let device = rodio::default_output_device().unwrap();
@@ -46,5 +46,4 @@ impl Speaker {
         let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
         rodio::play_raw(&device, source.convert_samples());
     }
-
 }

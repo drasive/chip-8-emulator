@@ -3,7 +3,6 @@ extern crate clap;
 extern crate sdl2;
 
 use clap::App;
-
 use sdl2::event::Event;
 
 use std::fs::File;
@@ -11,15 +10,17 @@ use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
-
-mod emulator;
-mod memory;
 mod cpu;
-mod keypad;
 mod display;
+mod emulator;
+mod keypad;
+mod memory;
 mod speaker;
 
+use cpu::*;
+use display::*;
 use emulator::Emulator;
+use keypad::*;
 
 fn main() {
     // Load configuration
@@ -34,7 +35,7 @@ fn main() {
     let display_scale = value_t!(parameters, "display_scale", u8).unwrap();
     let sound = parameters.is_present("sound");
     let debug_cpu = parameters.is_present("debug_cpu");
-    let debug_memory = parameters.is_present("debug_memory");    
+    let debug_memory = parameters.is_present("debug_memory");
 
     if clock_rate <= 0.0 {
         panic!("parameter \"clock_rate\" must be > 0");
@@ -45,15 +46,17 @@ fn main() {
 
     // Initialize emulator
     let mut emulator = Emulator::new(
-        clock_rate, ignore_unknown_instructions, program_address,
-        display_scale);
+        clock_rate,
+        ignore_unknown_instructions,
+        program_address,
+        display_scale,
+    );
 
     let mut rom_file = match File::open(&Path::new(rom)) {
         Ok(rom_file) => rom_file,
-        Err(_) => panic!("The specified ROM file does not exist")
+        Err(_) => panic!("The specified ROM file does not exist"),
     };
     emulator.load_rom(&mut rom_file).unwrap();
-    
     // Initialize rodeo
     // This needs to be done before SDL2 initialization: https://github.com/RustAudio/rodio/issues/214
     rodio::default_output_device();
@@ -66,8 +69,7 @@ fn main() {
 
     let sdl2_video = sdl2_context.video().unwrap();
     let window = emulator.display.create_window(&sdl2_video, rom);
-    let mut renderer =  window.into_canvas().build().unwrap();
-  
+    let mut renderer = window.into_canvas().build().unwrap();
     // Game loop
     let mut last_step_time = get_time(&sdl2_timing);
 
@@ -78,22 +80,35 @@ fn main() {
         for event in sdl2_events.poll_iter() {
             match event {
                 Event::Quit { .. } => break 'running,
-                Event::KeyDown { keycode: Some(keycode), .. } => emulator.keypad.key_down(keycode),
-                Event::KeyUp { keycode: Some(keycode), .. }   => emulator.keypad.key_up(keycode),
-                _ => ()
+                Event::KeyDown {
+                    keycode: Some(keycode),
+                    ..
+                } => emulator.keypad.key_down(keycode),
+                Event::KeyUp {
+                    keycode: Some(keycode),
+                    ..
+                } => emulator.keypad.key_up(keycode),
+                _ => (),
             }
         }
 
         // Emulation
-        let delta_time = (get_time(&sdl2_timing) - last_step_time) * 1000 / sdl2_timing.performance_frequency();
-        emulator.step(delta_time as f32, &mut renderer, sound, debug_cpu, debug_memory);
+        let delta_time =
+            (get_time(&sdl2_timing) - last_step_time) * 1000 / sdl2_timing.performance_frequency();
+        emulator.step(
+            delta_time as f32,
+            &mut renderer,
+            sound,
+            debug_cpu,
+            debug_memory,
+        );
 
         let frame_wait_duration = 1.0 / emulator.cpu.get_clock_rate() * 1000.0;
-        let processing_time = (get_time(&sdl2_timing) - processing_start) * 1000 / sdl2_timing.performance_frequency();
+        let processing_time = (get_time(&sdl2_timing) - processing_start) * 1000
+            / sdl2_timing.performance_frequency();
         let sleep_time = if frame_wait_duration as u32 > processing_time as u32 {
             frame_wait_duration as u32 - processing_time as u32
-        }
-        else {
+        } else {
             0
         };
 
