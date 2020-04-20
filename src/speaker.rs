@@ -4,10 +4,6 @@ use self::rodio::Source;
 use std::fs::File;
 use std::io::BufReader;
 
-#[cfg(test)]
-use mockall::{automock, predicate::*};
-
-#[cfg_attr(test, automock)]
 pub trait SpeakerTrait {
     fn queue_beep(&mut self);
     fn flush_queue(&mut self);

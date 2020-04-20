@@ -643,11 +643,11 @@ mod tests {
 
     const PROGRAM_START_ADDRESS: usize = 0x200;
 
-    fn instantiate_cpu_no_program(memory: &mut dyn MemoryTrait) -> Cpu {
-        instantiate_cpu(memory, vec![0x1200])
+    fn instantiate_cpu(memory: &mut dyn MemoryTrait) -> Cpu {
+        instantiate_cpu_with_program(memory, vec![0x1200]) // Filler instruction
     }
 
-    fn instantiate_cpu(memory: &mut dyn MemoryTrait, instructions: Vec<u16>) -> Cpu {
+    fn instantiate_cpu_with_program(memory: &mut dyn MemoryTrait, instructions: Vec<u16>) -> Cpu {
         let mut instructions_bytes: Vec<u8> = Vec::new();
         for instruction in instructions {
             instructions_bytes.extend(instruction.to_be_bytes().to_vec().into_iter());
@@ -663,26 +663,18 @@ mod tests {
         Memory::new() // Not mocked dued to simplicity
     }
 
-    fn step_cpu(cpu: &mut dyn CpuTrait, memory: &mut dyn MemoryTrait) {
+    fn execute_instruction(cpu: &mut Cpu, memory: &mut dyn MemoryTrait, opcode: u16) {
         let mut keypad = MockKeypadTrait::new();
         let mut display = MockDisplayTrait::new();
-        let mut speaker = MockSpeakerTrait::new();
 
-        cpu.step(
-            1.0,
-            memory,
-            &mut keypad,
-            &mut display,
-            &mut speaker,
-            false,
-            false,
-        )
+        cpu.opcode = opcode;
+        cpu.execute_instruction(memory, &mut keypad, &mut display);
     }
 
     #[test]
     fn test_initialize() {
         let mut memory = instantiate_memory();
-        let cpu = instantiate_cpu_no_program(&mut memory);
+        let cpu = instantiate_cpu(&mut memory);
 
         assert_eq!(cpu.pc, PROGRAM_START_ADDRESS);
         assert_eq!(cpu.sp, 0);
@@ -701,7 +693,7 @@ mod tests {
     #[test]
     fn test_load_rom() {
         let mut memory = instantiate_memory();
-        let _ = instantiate_cpu(&mut memory, vec![0x1234, 0x5678]);
+        let _ = instantiate_cpu_with_program(&mut memory, vec![0x1234, 0x5678]);
 
         assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x0), 0x12);
         assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x1), 0x34);
@@ -713,11 +705,11 @@ mod tests {
     #[test]
     fn test_op_ret_00ee() {
         let mut memory = instantiate_memory();
-        let mut cpu = instantiate_cpu(&mut memory, vec![0x00ee]);
+        let mut cpu = instantiate_cpu(&mut memory);
         cpu.sp = 4;
         cpu.stack[4] = 0x6666;
 
-        step_cpu(&mut cpu, &mut memory);
+        execute_instruction(&mut cpu, &mut memory, 0x00ee);
 
         assert_eq!(cpu.pc, 0x6666);
         assert_eq!(cpu.sp, 3);
@@ -726,9 +718,9 @@ mod tests {
     #[test]
     fn test_op_jp_1nnn() {
         let mut memory = instantiate_memory();
-        let mut cpu = instantiate_cpu(&mut memory, vec![0x1666]);
+        let mut cpu = instantiate_cpu(&mut memory);
 
-        step_cpu(&mut cpu, &mut memory);
+        execute_instruction(&mut cpu, &mut memory, 0x1666);
 
         assert_eq!(cpu.pc, 0x0666);
     }
@@ -736,11 +728,11 @@ mod tests {
     #[test]
     fn test_op_call_2nnn() {
         let mut memory = instantiate_memory();
-        let mut cpu = instantiate_cpu(&mut memory, vec![0x2666]);
+        let mut cpu = instantiate_cpu(&mut memory);
         cpu.sp = 4;
 
-        step_cpu(&mut cpu, &mut memory);
-        
+        execute_instruction(&mut cpu, &mut memory, 0x2666);
+
         assert_eq!(cpu.sp, 5);
         assert_eq!(cpu.stack[5], PROGRAM_START_ADDRESS);
         assert_eq!(cpu.pc, 0x0666);
