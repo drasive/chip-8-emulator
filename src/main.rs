@@ -17,10 +17,10 @@ mod keypad;
 mod memory;
 mod speaker;
 
-use cpu::*;
-use display::*;
-use emulator::Emulator;
-use keypad::*;
+use crate::cpu::*;
+use crate::display::*;
+use crate::emulator::Emulator;
+use crate::keypad::*;
 
 fn main() {
     // Load configuration

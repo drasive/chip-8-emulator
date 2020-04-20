@@ -6,10 +6,10 @@ use std::io::{BufWriter, Error, Read, Write};
 //use mockall::*;
 //use mockall::predicate::*;
 
-use display::DisplayTrait;
-use keypad::KeypadTrait;
-use memory::MemoryTrait;
-use speaker::SpeakerTrait;
+use crate::display::DisplayTrait;
+use crate::keypad::KeypadTrait;
+use crate::memory::MemoryTrait;
+use crate::speaker::SpeakerTrait;
 
 // Font data
 const FONT_WIDTH: usize = 5;
@@ -102,7 +102,7 @@ impl CpuTrait for Cpu {
         // Read ROM
         println!("Reading ROM");
         let mut rom = Vec::new();
-        try!(rom_reader.read_to_end(&mut rom));
+        r#try!(rom_reader.read_to_end(&mut rom));
 
         // Copy ROM into memory
         if rom.len() < 2 {
@@ -120,7 +120,7 @@ impl CpuTrait for Cpu {
             let mut memory_stream = BufWriter::new(
                 &mut memory.get_cells()[self.program_address..(self.program_address + rom.len())],
             );
-            try!(memory_stream.write_all(rom.as_ref()));
+            r#try!(memory_stream.write_all(rom.as_ref()));
         }
 
         self.pc = self.program_address;
@@ -637,7 +637,7 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use memory::*;
+    use crate::memory::*;
 
     fn instantiate_cpu_no_program(memory: &mut dyn MemoryTrait) -> Cpu {
         instantiate_cpu(memory, vec![0x1200])

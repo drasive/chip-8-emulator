@@ -1,6 +1,7 @@
 [package]
 name = "chip-8-emulator"
 version = "0.1.0"
+edition = "2018"
 authors = ["Dimitri Vranken <me@dimitrivranken.com>"]
 
 [dependencies]
