@@ -43,22 +43,22 @@ fn main() {
         panic!("parameter \"display_scale\" must be > 0");
     }
 
-	// Initialize emulator
-	let mut emulator = Emulator::new(
+    // Initialize emulator
+    let mut emulator = Emulator::new(
         clock_rate, ignore_unknown_instructions, program_address,
         display_scale);
 
-	let mut rom_file = match File::open(&Path::new(rom)) {
+    let mut rom_file = match File::open(&Path::new(rom)) {
         Ok(rom_file) => rom_file,
         Err(_) => panic!("The specified ROM file does not exist")
     };
-	emulator.load_rom(&mut rom_file).unwrap();
+    emulator.load_rom(&mut rom_file).unwrap();
     
     // Initialize rodeo
     // This needs to be done before SDL2 initialization: https://github.com/RustAudio/rodio/issues/214
     rodio::default_output_device();
 
-	// Initialize SDL2
+    // Initialize SDL2
     let sdl2_context = sdl2::init().unwrap();
 
     let mut sdl2_events = sdl2_context.event_pump().unwrap();
