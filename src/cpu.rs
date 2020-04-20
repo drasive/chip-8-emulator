@@ -639,9 +639,18 @@ mod tests {
     use super::*;
     use memory::*;
 
-    fn instantiate_cpu(memory: &mut dyn MemoryTrait, rom_reader: &mut dyn Read) -> Cpu {
+    fn instantiate_cpu_no_program(memory: &mut dyn MemoryTrait) -> Cpu {
+        instantiate_cpu(memory, vec![0x1200])
+    }
+
+    fn instantiate_cpu(memory: &mut dyn MemoryTrait, instructions: Vec<u16>) -> Cpu {
+        let mut instructions_bytes: Vec<u8> = Vec::new();
+        for instruction in instructions {
+            instructions_bytes.extend(instruction.to_be_bytes().to_vec().into_iter());
+        }
+
         let mut cpu = Cpu::new(600.0, false, 512);
-        cpu.load_rom(memory, rom_reader);
+        cpu.load_rom(memory, &mut std::io::Cursor::new(instructions_bytes)).unwrap();
         cpu
     }
 
@@ -650,9 +659,9 @@ mod tests {
     }
 
     #[test]
-    fn test_initial_state() {
+    fn test_initialize() {
         let mut memory = instantiate_memory();
-        let cpu = instantiate_cpu(&mut memory, &mut std::io::Cursor::new(vec![]));
+        let cpu = instantiate_cpu_no_program(&mut memory);
 
         assert_eq!(cpu.pc, 0x200);
         assert_eq!(cpu.sp, 0);
@@ -669,12 +678,14 @@ mod tests {
     }
 
     #[test]
-    fn test_load_data() {
+    fn test_load_rom() {
         let mut memory = instantiate_memory();
-        let _ = instantiate_cpu(&mut memory, &mut std::io::Cursor::new(vec![1, 2, 3]));
+        let _ = instantiate_cpu(&mut memory, vec![0x1234, 0x5678]);
 
-        assert_eq!(memory.get_cells()[0x200], 1);
-        assert_eq!(memory.get_cells()[0x201], 2);
-        assert_eq!(memory.get_cells()[0x202], 3);
+        assert_eq!(memory.read(0x200), 0x12);
+        assert_eq!(memory.read(0x201), 0x34);
+        assert_eq!(memory.read(0x202), 0x56);
+        assert_eq!(memory.read(0x203), 0x78);
+        assert_eq!(memory.read(0x204), 0x00);
     }
 }
