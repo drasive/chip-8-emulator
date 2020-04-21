@@ -235,7 +235,7 @@ impl Cpu {
                 // 1nnn - JP addr; Jump to location nnn.
                 // The interpreter sets the program counter to nnn.
 
-                self.pc = self.op_0kkk();
+                self.pc = self.op_0nnn();
             }
             (0x2, _, _, _) => {
                 // 2nnn - CALL addr; Call subroutine at nnn.
@@ -244,13 +244,13 @@ impl Cpu {
 
                 self.sp += 1;
                 self.stack[self.sp as usize] = self.pc as usize;
-                self.pc = self.op_0kkk();
+                self.pc = self.op_0nnn();
             }
             (0x3, x, _, _) => {
                 // 3xkk - SE Vx, byte; Skip next instruction if Vx = kk.
                 // The interpreter compares register Vx to kk, and if they are equal, increments the program counter by 2.
 
-                if self.v[x] == self.op_00nn() {
+                if self.v[x] == self.op_00kk() {
                     self.pc += 2 * 2;
                 } else {
                     self.pc += 2;
@@ -260,7 +260,7 @@ impl Cpu {
                 // 4xkk - SNE Vx, byte; Skip next instruction if Vx != kk.
                 // The interpreter compares register Vx to kk, and if they are not equal, increments the program counter by 2.
 
-                if self.v[x] != self.op_00nn() {
+                if self.v[x] != self.op_00kk() {
                     self.pc += 2 * 2;
                 } else {
                     self.pc += 2;
@@ -280,7 +280,7 @@ impl Cpu {
                 // 6xkk - LD Vx, byte; Set Vx = kk.
                 // The interpreter puts the value kk into register Vx.
 
-                self.v[x] = self.op_00nn();
+                self.v[x] = self.op_00kk();
 
                 self.pc += 2;
             }
@@ -288,7 +288,7 @@ impl Cpu {
                 // 7xkk - ADD Vx, byte; Set Vx = Vx + kk.
                 // Adds the value kk to the value of register Vx, then stores the result in Vx.
 
-                self.v[x] = self.v[x].wrapping_add(self.op_00nn());
+                self.v[x] = self.v[x].wrapping_add(self.op_00kk());
 
                 self.pc += 2;
             }
@@ -391,7 +391,7 @@ impl Cpu {
                 // Annn - LD I, addr; Set I = nnn.
                 // The value of register I is set to nnn.
 
-                self.i = self.op_0kkk() as u16;
+                self.i = self.op_0nnn() as u16;
 
                 self.pc += 2;
             }
@@ -399,7 +399,7 @@ impl Cpu {
                 // Bnnn - JP V0, addr; Jump to location nnn + V0.
                 // The program counter is set to nnn plus the value of V0.
 
-                self.pc = self.op_0kkk() + self.v[0x0] as usize;
+                self.pc = self.op_0nnn() + self.v[0x0] as usize;
             }
             (0xC, x, _, _) => {
                 // Cxkk - RND Vx, byte; Set Vx = random byte AND kk.
@@ -410,7 +410,7 @@ impl Cpu {
                 // Init once: let mut rng = rand::thread_rng();
                 // Use: rng.gen::<u8>()
 
-                self.v[x] = self.op_00nn() & rand::random::<u8>();
+                self.v[x] = self.op_00kk() & rand::random::<u8>();
 
                 self.pc += 2;
             }
@@ -577,11 +577,11 @@ impl Cpu {
         }
     }
 
-    fn op_00nn(&mut self) -> u8 {
+    fn op_00kk(&mut self) -> u8 {
         (self.opcode & 0x00FF) as u8
     }
 
-    fn op_0kkk(&mut self) -> usize {
+    fn op_0nnn(&mut self) -> usize {
         (self.opcode & 0x0FFF) as usize
     }
 
@@ -634,12 +634,13 @@ impl Cpu {
 
 #[cfg(test)]
 mod tests {
-    // Tests based on https://github.com/starrhorne/chip8-rust/blob/master/src/processor_test.rs (accessed 2020-04-21)
+    // Tests based on:
+    // - https://github.com/starrhorne/chip8-rust/blob/master/src/processor_test.rs (accessed 2020-04-21)
+    // - https://github.com/ismaelrh/Java-chip8-emulator/blob/master/src/test/java/chip8/ProcessingUnitTest.java (accessed 2020-04-21)
     use super::*;
     use crate::display::*;
     use crate::keypad::*;
     use crate::memory::*;
-    use crate::speaker::*;
 
     const PROGRAM_START_ADDRESS: usize = 0x200;
 
@@ -679,6 +680,7 @@ mod tests {
         assert_eq!(cpu.pc, PROGRAM_START_ADDRESS);
         assert_eq!(cpu.sp, 0);
         assert_eq!(cpu.stack, [0; 16]);
+        assert_eq!(cpu.i, 0);
 
         // First char in font: 0
         assert_eq!(memory.get_cells()[0..5], [0xF0, 0x90, 0x90, 0x90, 0xF0]);
@@ -708,13 +710,13 @@ mod tests {
     fn test_op_00ee_ret() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
-        cpu.sp = 4;
-        cpu.stack[4] = 0x6666;
+        cpu.sp = 10;
+        cpu.stack[10] = 0xBEEF;
 
         execute_instruction(&mut cpu, &mut memory, 0x00ee);
 
-        assert_eq!(cpu.pc, 0x6666);
-        assert_eq!(cpu.sp, 3);
+        assert_eq!(cpu.pc, 0xBEEF + 2);
+        assert_eq!(cpu.sp, 9);
     }
 
     #[test]
@@ -722,72 +724,83 @@ mod tests {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
 
-        execute_instruction(&mut cpu, &mut memory, 0x1666);
+        execute_instruction(&mut cpu, &mut memory, 0x1DAD);
 
-        assert_eq!(cpu.pc, 0x0666);
+        assert_eq!(cpu.pc, 0x0DAD);
     }
 
     #[test]
     fn test_op_2nnn_call() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
-        cpu.sp = 4;
+        cpu.sp = 10;
 
-        execute_instruction(&mut cpu, &mut memory, 0x2666);
+        execute_instruction(&mut cpu, &mut memory, 0x2DAD);
 
-        assert_eq!(cpu.sp, 5);
-        assert_eq!(cpu.stack[5], PROGRAM_START_ADDRESS);
-        assert_eq!(cpu.pc, 0x0666);
+        assert_eq!(cpu.pc, 0x0DAD);
+        assert_eq!(cpu.sp, 11);
+        assert_eq!(cpu.stack[11], PROGRAM_START_ADDRESS);
     }
 
     #[test]
     fn test_op_3xkk_sevx() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
-        cpu.v[2] = 0x05;
-        execute_instruction(&mut cpu, &mut memory, 0x3204);
+        cpu.v[0xA] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x3A06);
         assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
 
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
-        cpu.v[2] = 0x05;
-        execute_instruction(&mut cpu, &mut memory, 0x3205);
-        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + (2 * 2));
+        cpu.v[0xA] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x3A07);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
     }
 
     #[test]
     fn test_op_4xkk_snevx() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
-        cpu.v[2] = 0x05;
-        execute_instruction(&mut cpu, &mut memory, 0x4204);
+        cpu.v[0xA] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x4A06);
         assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
 
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
-        cpu.v[2] = 0x05;
-        execute_instruction(&mut cpu, &mut memory, 0x4205);
+        cpu.v[0xA] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x4A07);
         assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
     }
 
-    // // SE VX, VY
-    // #[test]
-    // fn test_op_5xy0() {
-    //     let mut cpu = instantiate_cpu();
-    //     cpu.run_opcode(0x5540);
-    //     assert_eq!(cpu.pc, SKIPPED_PC);
-    //     let mut cpu = instantiate_cpu();
-    //     cpu.run_opcode(0x5500);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // LD Vx, byte
-    // #[test]
-    // fn test_op_6xkk() {
-    //     let mut cpu = instantiate_cpu();
-    //     cpu.run_opcode(0x65ff);
-    //     assert_eq!(cpu.v[5], 0xff);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
+    #[test]
+    fn test_op_5xy0_sevxvy() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        cpu.v[0xB] = 0x06;
+        execute_instruction(&mut cpu, &mut memory, 0x5AB0);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        cpu.v[0xB] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x5AB0);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
+    }
+
+    #[test]
+    fn test_op_6xkk_ldvx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x06;
+
+        execute_instruction(&mut cpu, &mut memory, 0x6A07);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xA], 0x07);
+    }
+
     // // ADD Vx, byte
     // #[test]
     // fn test_op_7xkk() {
@@ -1095,4 +1108,18 @@ mod tests {
     //     assert_eq!(cpu.delay_timer, 199);
     //     assert_eq!(cpu.sound_timer, 99);
     // }
+
+    #[test]
+    fn test_op_call_ret() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.sp = 10;
+
+        execute_instruction(&mut cpu, &mut memory, 0x2DAD);
+        execute_instruction(&mut cpu, &mut memory, 0x00EE);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.sp, 10);
+        assert_eq!(cpu.stack[11], PROGRAM_START_ADDRESS);
+    }
 }
