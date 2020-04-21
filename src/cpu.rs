@@ -235,7 +235,7 @@ impl Cpu {
                 // 1nnn - JP addr; Jump to location nnn.
                 // The interpreter sets the program counter to nnn.
 
-                self.pc = self.op_0fff();
+                self.pc = self.op_0kkk();
             }
             (0x2, _, _, _) => {
                 // 2nnn - CALL addr; Call subroutine at nnn.
@@ -244,13 +244,13 @@ impl Cpu {
 
                 self.sp += 1;
                 self.stack[self.sp as usize] = self.pc as usize;
-                self.pc = self.op_0fff();
+                self.pc = self.op_0kkk();
             }
             (0x3, x, _, _) => {
                 // 3xkk - SE Vx, byte; Skip next instruction if Vx = kk.
                 // The interpreter compares register Vx to kk, and if they are equal, increments the program counter by 2.
 
-                if self.v[x] == self.op_00ff() {
+                if self.v[x] == self.op_00nn() {
                     self.pc += 2 * 2;
                 } else {
                     self.pc += 2;
@@ -260,7 +260,7 @@ impl Cpu {
                 // 4xkk - SNE Vx, byte; Skip next instruction if Vx != kk.
                 // The interpreter compares register Vx to kk, and if they are not equal, increments the program counter by 2.
 
-                if self.v[x] != self.op_00ff() {
+                if self.v[x] != self.op_00nn() {
                     self.pc += 2 * 2;
                 } else {
                     self.pc += 2;
@@ -280,7 +280,7 @@ impl Cpu {
                 // 6xkk - LD Vx, byte; Set Vx = kk.
                 // The interpreter puts the value kk into register Vx.
 
-                self.v[x] = self.op_00ff();
+                self.v[x] = self.op_00nn();
 
                 self.pc += 2;
             }
@@ -288,7 +288,7 @@ impl Cpu {
                 // 7xkk - ADD Vx, byte; Set Vx = Vx + kk.
                 // Adds the value kk to the value of register Vx, then stores the result in Vx.
 
-                self.v[x] = self.v[x].wrapping_add(self.op_00ff());
+                self.v[x] = self.v[x].wrapping_add(self.op_00nn());
 
                 self.pc += 2;
             }
@@ -391,7 +391,7 @@ impl Cpu {
                 // Annn - LD I, addr; Set I = nnn.
                 // The value of register I is set to nnn.
 
-                self.i = self.op_0fff() as u16;
+                self.i = self.op_0kkk() as u16;
 
                 self.pc += 2;
             }
@@ -399,7 +399,7 @@ impl Cpu {
                 // Bnnn - JP V0, addr; Jump to location nnn + V0.
                 // The program counter is set to nnn plus the value of V0.
 
-                self.pc = self.op_0fff() + self.v[0x0] as usize;
+                self.pc = self.op_0kkk() + self.v[0x0] as usize;
             }
             (0xC, x, _, _) => {
                 // Cxkk - RND Vx, byte; Set Vx = random byte AND kk.
@@ -410,7 +410,7 @@ impl Cpu {
                 // Init once: let mut rng = rand::thread_rng();
                 // Use: rng.gen::<u8>()
 
-                self.v[x] = self.op_00ff() & rand::random::<u8>();
+                self.v[x] = self.op_00nn() & rand::random::<u8>();
 
                 self.pc += 2;
             }
@@ -577,11 +577,11 @@ impl Cpu {
         }
     }
 
-    fn op_00ff(&mut self) -> u8 {
+    fn op_00nn(&mut self) -> u8 {
         (self.opcode & 0x00FF) as u8
     }
 
-    fn op_0fff(&mut self) -> usize {
+    fn op_0kkk(&mut self) -> usize {
         (self.opcode & 0x0FFF) as usize
     }
 
