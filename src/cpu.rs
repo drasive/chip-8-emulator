@@ -634,6 +634,7 @@ impl Cpu {
     }
 }
 
+// TODO: Split into separate file
 #[cfg(test)]
 mod tests {
     // Tests based on:
@@ -718,6 +719,20 @@ mod tests {
         assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x2), 0x56);
         assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x3), 0x78);
         assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x4), 0x00);
+    }
+
+    #[test]
+    fn test_call_and_ret() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.sp = 10;
+
+        execute_instruction(&mut cpu, &mut memory, 0x2DAD);
+        execute_instruction(&mut cpu, &mut memory, 0x00EE);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.sp, 10);
+        assert_eq!(cpu.stack[11], PROGRAM_START_ADDRESS);
     }
 
     // TODO: CLS
@@ -897,47 +912,58 @@ mod tests {
         test_math(0b00000111, 0, 0x0e, 0b00001110, 0);
     }
 
-    // // SNE VX, VY
-    // #[test]
-    // fn test_op_9xy0() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.run_opcode(0x90e0);
-    //     assert_eq!(cpu.pc, SKIPPED_PC);
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.run_opcode(0x9010);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // LD I, byte
-    // #[test]
-    // fn test_op_annn() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.run_opcode(0xa123);
-    //     assert_eq!(cpu.i, 0x123);
-    // }
-    // // JP V0, addr
-    // #[test]
-    // fn test_op_bnnn() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.v[0] = 3;
-    //     cpu.run_opcode(0xb123);
-    //     assert_eq!(cpu.pc, 0x126);
-    // }
-    // // RND Vx, byte
-    // // Generates random u8, then ANDs it with kk.
-    // // We can't test randomness, but we can test the AND.
-    // #[test]
-    // fn test_op_cxkk() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.run_opcode(0xc000);
-    //     assert_eq!(cpu.v[0], 0);
-    //     cpu.run_opcode(0xc00f);
-    //     assert_eq!(cpu.v[0] & 0xf0, 0);
-    // }
+    #[test]
+    fn test_op_9xy0_snevxvy() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        cpu.v[0xB] = 0x06;
+        execute_instruction(&mut cpu, &mut memory, 0x9AB0);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        cpu.v[0xB] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x9AB0);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+    }
+
+    #[test]
+    fn test_op_annn_ldi() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+
+        execute_instruction(&mut cpu, &mut memory, 0xaDAD);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.i, 0xDAD);
+    }
+
+    #[test]
+    fn test_op_bnnn_jpv0() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0x0] = 0x07;
+
+        execute_instruction(&mut cpu, &mut memory, 0xbDAD);
+
+        assert_eq!(cpu.pc, 0xDAD + 0x07);
+    }
+
+    #[test]
+    fn test_op_cxkk_randvx() {
+        // TODO: Add test for non null value
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+
+        execute_instruction(&mut cpu, &mut memory, 0xcA00);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xA], 0);
+    }
+
+    // TODO: Implement tests
     // // DRW Vx, Vy, nibble
     // #[test]
     // fn test_op_dxyn() {
@@ -1150,18 +1176,4 @@ mod tests {
     //     assert_eq!(cpu.delay_timer, 199);
     //     assert_eq!(cpu.sound_timer, 99);
     // }
-
-    #[test]
-    fn test_op_call_and_ret() {
-        let mut memory = instantiate_memory();
-        let mut cpu = instantiate_cpu(&mut memory);
-        cpu.sp = 10;
-
-        execute_instruction(&mut cpu, &mut memory, 0x2DAD);
-        execute_instruction(&mut cpu, &mut memory, 0x00EE);
-
-        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
-        assert_eq!(cpu.sp, 10);
-        assert_eq!(cpu.stack[11], PROGRAM_START_ADDRESS);
-    }
 }
