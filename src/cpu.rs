@@ -702,8 +702,10 @@ mod tests {
         assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x4), 0x00);
     }
 
+    // TODO: CLS
+
     #[test]
-    fn test_op_ret_00ee() {
+    fn test_op_00ee_ret() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
         cpu.sp = 4;
@@ -716,7 +718,7 @@ mod tests {
     }
 
     #[test]
-    fn test_op_jp_1nnn() {
+    fn test_op_1nnn_jp() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
 
@@ -726,7 +728,7 @@ mod tests {
     }
 
     #[test]
-    fn test_op_call_2nnn() {
+    fn test_op_2nnn_call() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
         cpu.sp = 4;
@@ -738,26 +740,36 @@ mod tests {
         assert_eq!(cpu.pc, 0x0666);
     }
 
-    // // SE VX, byte
-    // #[test]
-    // fn test_op_3xkk() {
-    //     let mut cpu = instantiate_cpu();
-    //     cpu.run_opcode(0x3201);
-    //     assert_eq!(cpu.pc, SKIPPED_PC);
-    //     let mut cpu = instantiate_cpu();
-    //     cpu.run_opcode(0x3200);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // SNE VX, byte
-    // #[test]
-    // fn test_op_4xkk() {
-    //     let mut cpu = instantiate_cpu();
-    //     cpu.run_opcode(0x4200);
-    //     assert_eq!(cpu.pc, SKIPPED_PC);
-    //     let mut cpu = instantiate_cpu();
-    //     cpu.run_opcode(0x4201);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
+    #[test]
+    fn test_op_3xkk_sevx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[2] = 0x05;
+        execute_instruction(&mut cpu, &mut memory, 0x3204);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[2] = 0x05;
+        execute_instruction(&mut cpu, &mut memory, 0x3205);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + (2 * 2));
+    }
+
+    #[test]
+    fn test_op_4xkk_snevx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[2] = 0x05;
+        execute_instruction(&mut cpu, &mut memory, 0x4204);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[2] = 0x05;
+        execute_instruction(&mut cpu, &mut memory, 0x4205);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
+    }
+
     // // SE VX, VY
     // #[test]
     // fn test_op_5xy0() {
