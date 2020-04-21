@@ -1,15 +1,12 @@
 extern crate rand;
 extern crate sdl2;
-//extern crate mockall;
 
 use std::io::{BufWriter, Error, Read, Write};
-//use mockall::*;
-//use mockall::predicate::*;
 
-use display::DisplayTrait;
-use keypad::KeypadTrait;
-use memory::MemoryTrait;
-use speaker::SpeakerTrait;
+use crate::display::DisplayTrait;
+use crate::keypad::KeypadTrait;
+use crate::memory::MemoryTrait;
+use crate::speaker::SpeakerTrait;
 
 // Font data
 const FONT_WIDTH: usize = 5;
@@ -35,8 +32,11 @@ const FONT: [u8; FONT_BYTES] = [
 ];
 
 pub trait CpuTrait {
-    fn load_rom(&mut self, memory: &mut dyn MemoryTrait, rom_reader: &mut dyn Read)
-        -> Result<usize, Error>;
+    fn load_rom(
+        &mut self,
+        memory: &mut dyn MemoryTrait,
+        rom_reader: &mut dyn Read,
+    ) -> Result<usize, Error>;
     fn step(
         &mut self,
         delta_time: f32,
@@ -102,7 +102,7 @@ impl CpuTrait for Cpu {
         // Read ROM
         println!("Reading ROM");
         let mut rom = Vec::new();
-        try!(rom_reader.read_to_end(&mut rom));
+        r#try!(rom_reader.read_to_end(&mut rom));
 
         // Copy ROM into memory
         if rom.len() < 2 {
@@ -120,7 +120,7 @@ impl CpuTrait for Cpu {
             let mut memory_stream = BufWriter::new(
                 &mut memory.get_cells()[self.program_address..(self.program_address + rom.len())],
             );
-            try!(memory_stream.write_all(rom.as_ref()));
+            r#try!(memory_stream.write_all(rom.as_ref()));
         }
 
         self.pc = self.program_address;
@@ -237,7 +237,7 @@ impl Cpu {
                 // 1nnn - JP addr; Jump to location nnn.
                 // The interpreter sets the program counter to nnn.
 
-                self.pc = self.op_0fff();
+                self.pc = self.op_0nnn();
             }
             (0x2, _, _, _) => {
                 // 2nnn - CALL addr; Call subroutine at nnn.
@@ -246,13 +246,13 @@ impl Cpu {
 
                 self.sp += 1;
                 self.stack[self.sp as usize] = self.pc as usize;
-                self.pc = self.op_0fff();
+                self.pc = self.op_0nnn();
             }
             (0x3, x, _, _) => {
                 // 3xkk - SE Vx, byte; Skip next instruction if Vx = kk.
                 // The interpreter compares register Vx to kk, and if they are equal, increments the program counter by 2.
 
-                if self.v[x] == self.op_00ff() {
+                if self.v[x] == self.op_00kk() {
                     self.pc += 2 * 2;
                 } else {
                     self.pc += 2;
@@ -262,7 +262,7 @@ impl Cpu {
                 // 4xkk - SNE Vx, byte; Skip next instruction if Vx != kk.
                 // The interpreter compares register Vx to kk, and if they are not equal, increments the program counter by 2.
 
-                if self.v[x] != self.op_00ff() {
+                if self.v[x] != self.op_00kk() {
                     self.pc += 2 * 2;
                 } else {
                     self.pc += 2;
@@ -282,7 +282,7 @@ impl Cpu {
                 // 6xkk - LD Vx, byte; Set Vx = kk.
                 // The interpreter puts the value kk into register Vx.
 
-                self.v[x] = self.op_00ff();
+                self.v[x] = self.op_00kk();
 
                 self.pc += 2;
             }
@@ -290,7 +290,7 @@ impl Cpu {
                 // 7xkk - ADD Vx, byte; Set Vx = Vx + kk.
                 // Adds the value kk to the value of register Vx, then stores the result in Vx.
 
-                self.v[x] = self.v[x].wrapping_add(self.op_00ff());
+                self.v[x] = self.v[x].wrapping_add(self.op_00kk());
 
                 self.pc += 2;
             }
@@ -393,7 +393,7 @@ impl Cpu {
                 // Annn - LD I, addr; Set I = nnn.
                 // The value of register I is set to nnn.
 
-                self.i = self.op_0fff() as u16;
+                self.i = self.op_0nnn() as u16;
 
                 self.pc += 2;
             }
@@ -401,7 +401,7 @@ impl Cpu {
                 // Bnnn - JP V0, addr; Jump to location nnn + V0.
                 // The program counter is set to nnn plus the value of V0.
 
-                self.pc = self.op_0fff() + self.v[0x0] as usize;
+                self.pc = self.op_0nnn() + self.v[0x0] as usize;
             }
             (0xC, x, _, _) => {
                 // Cxkk - RND Vx, byte; Set Vx = random byte AND kk.
@@ -412,7 +412,7 @@ impl Cpu {
                 // Init once: let mut rng = rand::thread_rng();
                 // Use: rng.gen::<u8>()
 
-                self.v[x] = self.op_00ff() & rand::random::<u8>();
+                self.v[x] = self.op_00kk() & rand::random::<u8>();
 
                 self.pc += 2;
             }
@@ -579,11 +579,11 @@ impl Cpu {
         }
     }
 
-    fn op_00ff(&mut self) -> u8 {
+    fn op_00kk(&mut self) -> u8 {
         (self.opcode & 0x00FF) as u8
     }
 
-    fn op_0fff(&mut self) -> usize {
+    fn op_0nnn(&mut self) -> usize {
         (self.opcode & 0x0FFF) as usize
     }
 
@@ -636,21 +636,29 @@ impl Cpu {
 
 #[cfg(test)]
 mod tests {
+    // Tests based on:
+    // - https://github.com/starrhorne/chip8-rust/blob/master/src/processor_test.rs (accessed 2020-04-21)
+    // - https://github.com/ismaelrh/Java-chip8-emulator/blob/master/src/test/java/chip8/ProcessingUnitTest.java (accessed 2020-04-21)
     use super::*;
-    use memory::*;
+    use crate::display::*;
+    use crate::keypad::*;
+    use crate::memory::*;
 
-    fn instantiate_cpu_no_program(memory: &mut dyn MemoryTrait) -> Cpu {
-        instantiate_cpu(memory, vec![0x1200])
+    const PROGRAM_START_ADDRESS: usize = 0x200;
+
+    fn instantiate_cpu(memory: &mut dyn MemoryTrait) -> Cpu {
+        instantiate_cpu_with_program(memory, vec![0x1200]) // Filler instruction
     }
 
-    fn instantiate_cpu(memory: &mut dyn MemoryTrait, instructions: Vec<u16>) -> Cpu {
+    fn instantiate_cpu_with_program(memory: &mut dyn MemoryTrait, instructions: Vec<u16>) -> Cpu {
         let mut instructions_bytes: Vec<u8> = Vec::new();
         for instruction in instructions {
             instructions_bytes.extend(instruction.to_be_bytes().to_vec().into_iter());
         }
 
-        let mut cpu = Cpu::new(600.0, false, 512);
-        cpu.load_rom(memory, &mut std::io::Cursor::new(instructions_bytes)).unwrap();
+        let mut cpu = Cpu::new(600.0, false, PROGRAM_START_ADDRESS);
+        cpu.load_rom(memory, &mut std::io::Cursor::new(instructions_bytes))
+            .unwrap();
         cpu
     }
 
@@ -658,14 +666,37 @@ mod tests {
         Memory::new() // Not mocked dued to simplicity
     }
 
+    fn execute_instruction(cpu: &mut Cpu, memory: &mut dyn MemoryTrait, opcode: u16) {
+        let mut keypad = MockKeypadTrait::new();
+        let mut display = MockDisplayTrait::new();
+
+        cpu.opcode = opcode;
+        cpu.execute_instruction(memory, &mut keypad, &mut display);
+    }
+
+    fn test_math(v1: u8, v2: u8, operation: u16, expected_result: u8, expected_vf: u8) {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0x0] = v1;
+        cpu.v[0x1] = v2;
+        cpu.v[0xf] = 0;
+        
+        execute_instruction(&mut cpu, &mut memory, 0x8010 + operation);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0x0], expected_result);
+        assert_eq!(cpu.v[0xf], expected_vf);
+    }
+
     #[test]
     fn test_initialize() {
         let mut memory = instantiate_memory();
-        let cpu = instantiate_cpu_no_program(&mut memory);
+        let cpu = instantiate_cpu(&mut memory);
 
-        assert_eq!(cpu.pc, 0x200);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS);
         assert_eq!(cpu.sp, 0);
         assert_eq!(cpu.stack, [0; 16]);
+        assert_eq!(cpu.i, 0);
 
         // First char in font: 0
         assert_eq!(memory.get_cells()[0..5], [0xF0, 0x90, 0x90, 0x90, 0xF0]);
@@ -680,12 +711,457 @@ mod tests {
     #[test]
     fn test_load_rom() {
         let mut memory = instantiate_memory();
-        let _ = instantiate_cpu(&mut memory, vec![0x1234, 0x5678]);
+        let _ = instantiate_cpu_with_program(&mut memory, vec![0x1234, 0x5678]);
 
-        assert_eq!(memory.read(0x200), 0x12);
-        assert_eq!(memory.read(0x201), 0x34);
-        assert_eq!(memory.read(0x202), 0x56);
-        assert_eq!(memory.read(0x203), 0x78);
-        assert_eq!(memory.read(0x204), 0x00);
+        assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x0), 0x12);
+        assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x1), 0x34);
+        assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x2), 0x56);
+        assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x3), 0x78);
+        assert_eq!(memory.read(PROGRAM_START_ADDRESS + 0x4), 0x00);
+    }
+
+    // TODO: CLS
+
+    #[test]
+    fn test_op_00ee_ret() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.sp = 10;
+        cpu.stack[10] = 0xBEEF;
+
+        execute_instruction(&mut cpu, &mut memory, 0x00ee);
+
+        assert_eq!(cpu.pc, 0xBEEF + 2);
+        assert_eq!(cpu.sp, 9);
+    }
+
+    #[test]
+    fn test_op_1nnn_jp() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+
+        execute_instruction(&mut cpu, &mut memory, 0x1DAD);
+
+        assert_eq!(cpu.pc, 0x0DAD);
+    }
+
+    #[test]
+    fn test_op_2nnn_call() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.sp = 10;
+
+        execute_instruction(&mut cpu, &mut memory, 0x2DAD);
+
+        assert_eq!(cpu.pc, 0x0DAD);
+        assert_eq!(cpu.sp, 11);
+        assert_eq!(cpu.stack[11], PROGRAM_START_ADDRESS);
+    }
+
+    #[test]
+    fn test_op_3xkk_sevx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x3A06);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x3A07);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
+    }
+
+    #[test]
+    fn test_op_4xkk_snevx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x4A06);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x4A07);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
+    }
+
+    #[test]
+    fn test_op_5xy0_sevxvy() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        cpu.v[0xB] = 0x06;
+        execute_instruction(&mut cpu, &mut memory, 0x5AB0);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x07;
+        cpu.v[0xB] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x5AB0);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
+    }
+
+    #[test]
+    fn test_op_6xkk_ldvx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x06;
+
+        execute_instruction(&mut cpu, &mut memory, 0x6A07);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xA], 0x07);
+    }
+
+    #[test]
+    fn test_op_7xkk_addvx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x06;
+        execute_instruction(&mut cpu, &mut memory, 0x7A01);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xA], 0x07);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0xFF;
+        execute_instruction(&mut cpu, &mut memory, 0x7A01);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xA], 0x00);
+    }
+    
+    #[test]
+    fn test_op_8xy0() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0xA] = 0x00;
+        cpu.v[0xB] = 0x07;
+        execute_instruction(&mut cpu, &mut memory, 0x8AB0);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xA], 0x07);
+        assert_eq!(cpu.v[0xB], 0x07);
+    }
+
+    #[test]
+    fn test_op_8xy1_orvxvy() {
+        // 0x0F or 0xF0 == 0xFF
+        test_math(0x0F, 0xF0, 1, 0xFF, 0);
+    }
+
+    #[test]
+    fn test_op_8xy2_andvxvy() {
+        // 0x0F and 0xFF == 0x0F
+        test_math(0x0F, 0xFF, 2, 0x0F, 0);
+    }
+
+    #[test]
+    fn test_op_8xy3_xorvxvy() {
+        // 0x0F xor 0xFF == 0xF0
+        test_math(0x0F, 0xFF, 3, 0xF0, 0);
+    }
+
+    #[test]
+    fn test_op_8xy4_addvxvy() {
+        test_math(0x0F, 0x0F, 4, 0x1E, 0);
+        test_math(0xFF, 0xFF, 4, 0xFE, 1);
+    }
+
+    #[test]
+    fn test_op_8xy5_subvxvy() {
+        test_math(0x0F, 0x01, 5, 0x0E, 1);
+        test_math(0x0F, 0xFF, 5, 0x10, 0);
+    }
+ 
+    #[test]
+    fn test_op_8x06_shrvx() {
+        // 4 >> 1 == 2
+        test_math(0x04, 0, 6, 0x02, 0);
+        // 5 >> 1 == 2 with carry
+        test_math(0x05, 0, 6, 0x02, 1);
+    }
+
+    #[test]
+    fn test_op_8xy7_subnvxvy() {
+        test_math(0x01, 0x0F, 7, 0x0E, 1);
+        test_math(0xFF, 0x0F, 7, 0x10, 0);
+    }
+
+    #[test]
+    fn test_op_8x0e_shlvx() {
+        test_math(0b11000000, 0, 0x0e, 0b10000000, 1);
+        test_math(0b00000111, 0, 0x0e, 0b00001110, 0);
+    }
+
+    // // SNE VX, VY
+    // #[test]
+    // fn test_op_9xy0() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.run_opcode(0x90e0);
+    //     assert_eq!(cpu.pc, SKIPPED_PC);
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.run_opcode(0x9010);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // LD I, byte
+    // #[test]
+    // fn test_op_annn() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.run_opcode(0xa123);
+    //     assert_eq!(cpu.i, 0x123);
+    // }
+    // // JP V0, addr
+    // #[test]
+    // fn test_op_bnnn() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.v[0] = 3;
+    //     cpu.run_opcode(0xb123);
+    //     assert_eq!(cpu.pc, 0x126);
+    // }
+    // // RND Vx, byte
+    // // Generates random u8, then ANDs it with kk.
+    // // We can't test randomness, but we can test the AND.
+    // #[test]
+    // fn test_op_cxkk() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.run_opcode(0xc000);
+    //     assert_eq!(cpu.v[0], 0);
+    //     cpu.run_opcode(0xc00f);
+    //     assert_eq!(cpu.v[0] & 0xf0, 0);
+    // }
+    // // DRW Vx, Vy, nibble
+    // #[test]
+    // fn test_op_dxyn() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.i = 0;
+    //     memory.cells[0] = 0b11111111;
+    //     memory.cells[1] = 0b00000000;
+    //     cpu.vram[0][0] = 1;
+    //     cpu.vram[0][1] = 0;
+    //     cpu.vram[1][0] = 1;
+    //     cpu.vram[1][1] = 0;
+    //     cpu.v[0] = 0;
+    //     cpu.run_opcode(0xd002);
+    //     assert_eq!(cpu.vram[0][0], 0);
+    //     assert_eq!(cpu.vram[0][1], 1);
+    //     assert_eq!(cpu.vram[1][0], 1);
+    //     assert_eq!(cpu.vram[1][1], 0);
+    //     assert_eq!(cpu.v[0x0f], 1);
+    //     assert!(cpu.vram_changed);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // #[test]
+    // fn test_op_dxyn_wrap_horizontal() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     let x = CHIP8_WIDTH - 4;
+    //     cpu.i = 0;
+    //     memory.cells[0] = 0b11111111;
+    //     cpu.v[0] = x as u8;
+    //     cpu.v[1] = 0;
+    //     cpu.run_opcode(0xd011);
+    //     assert_eq!(cpu.vram[0][x - 1], 0);
+    //     assert_eq!(cpu.vram[0][x], 1);
+    //     assert_eq!(cpu.vram[0][x + 1], 1);
+    //     assert_eq!(cpu.vram[0][x + 2], 1);
+    //     assert_eq!(cpu.vram[0][x + 3], 1);
+    //     assert_eq!(cpu.vram[0][0], 1);
+    //     assert_eq!(cpu.vram[0][1], 1);
+    //     assert_eq!(cpu.vram[0][2], 1);
+    //     assert_eq!(cpu.vram[0][3], 1);
+    //     assert_eq!(cpu.vram[0][4], 0);
+    //     assert_eq!(cpu.v[0x0f], 0);
+    // }
+    // // DRW Vx, Vy, nibble
+    // #[test]
+    // fn test_op_dxyn_wrap_vertical() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     let y = CHIP8_HEIGHT - 1;
+    //     cpu.i = 0;
+    //     memory.cells[0] = 0b11111111;
+    //     memory.cells[1] = 0b11111111;
+    //     cpu.v[0] = 0;
+    //     cpu.v[1] = y as u8;
+    //     cpu.run_opcode(0xd012);
+    //     assert_eq!(cpu.vram[y][0], 1);
+    //     assert_eq!(cpu.vram[0][0], 1);
+    //     assert_eq!(cpu.v[0x0f], 0);
+    // }
+    // // SKP Vx
+    // #[test]
+    // fn test_op_ex9e() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.keypad[9] = true;
+    //     cpu.v[5] = 9;
+    //     cpu.run_opcode(0xe59e);
+    //     assert_eq!(cpu.pc, SKIPPED_PC);
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.v[5] = 9;
+    //     cpu.run_opcode(0xe59e);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // SKNP Vx
+    // #[test]
+    // fn test_op_exa1() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.keypad[9] = true;
+    //     cpu.v[5] = 9;
+    //     cpu.run_opcode(0xe5a1);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.v[5] = 9;
+    //     cpu.run_opcode(0xe5a1);
+    //     assert_eq!(cpu.pc, SKIPPED_PC);
+    // }
+    // // LD Vx, DT
+    // #[test]
+    // fn test_op_fx07() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.delay_timer = 20;
+    //     cpu.run_opcode(0xf507);
+    //     assert_eq!(cpu.v[5], 20);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // LD Vx, K
+    // #[test]
+    // fn test_op_fx0a() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.run_opcode(0xf50a);
+    //     assert_eq!(cpu.keypad_waiting, true);
+    //     assert_eq!(cpu.keypad_register, 5);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    //     // Tick with no keypresses doesn't do anything
+    //     cpu.tick([false; 16]);
+    //     assert_eq!(cpu.keypad_waiting, true);
+    //     assert_eq!(cpu.keypad_register, 5);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    //     // Tick with a keypress finishes wait and loads
+    //     // first pressed key into vx
+    //     cpu.tick([true; 16]);
+    //     assert_eq!(cpu.keypad_waiting, false);
+    //     assert_eq!(cpu.v[5], 0);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // LD DT, vX
+    // #[test]
+    // fn test_op_fx15() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.v[5] = 9;
+    //     cpu.run_opcode(0xf515);
+    //     assert_eq!(cpu.delay_timer, 9);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // LD ST, vX
+    // #[test]
+    // fn test_op_fx18() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.v[5] = 9;
+    //     cpu.run_opcode(0xf518);
+    //     assert_eq!(cpu.sound_timer, 9);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // ADD I, Vx
+    // #[test]
+    // fn test_op_fx1e() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.v[5] = 9;
+    //     cpu.i = 9;
+    //     cpu.run_opcode(0xf51e);
+    //     assert_eq!(cpu.i, 18);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // LD F, Vx
+    // #[test]
+    // fn test_op_fx29() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.v[5] = 9;
+    //     cpu.run_opcode(0xf529);
+    //     assert_eq!(cpu.i, 5 * 9);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // LD B, Vx
+    // #[test]
+    // fn test_op_fx33() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.v[5] = 123;
+    //     cpu.i = 1000;
+    //     cpu.run_opcode(0xf533);
+    //     assert_eq!(memory.cells[1000], 1);
+    //     assert_eq!(memory.cells[1001], 2);
+    //     assert_eq!(memory.cells[1002], 3);
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // LD [I], Vx
+    // #[test]
+    // fn test_op_fx55() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.i = 1000;
+    //     cpu.run_opcode(0xff55);
+    //     for i in 0..16 {
+    //         assert_eq!(memory.cells[1000 + i as usize], cpu.v[i]);
+    //     }
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // // LD Vx, [I]
+    // #[test]
+    // fn test_op_fx65() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     for i in 0..16 as usize {
+    //         memory.cells[1000 + i] = i as u8;
+    //     }
+    //     cpu.i = 1000;
+    //     cpu.run_opcode(0xff65);
+    //     for i in 0..16 as usize {
+    //         assert_eq!(cpu.v[i], memory.cells[1000 + i]);
+    //     }
+    //     assert_eq!(cpu.pc, NEXT_PC);
+    // }
+    // #[test]
+    // fn test_timers() {
+    //     let mut memory = instantiate_memory();
+    //     let mut cpu = instantiate_cpu(&mut memory);
+    //     cpu.delay_timer = 200;
+    //     cpu.sound_timer = 100;
+    //     cpu.tick([false; 16]);
+    //     assert_eq!(cpu.delay_timer, 199);
+    //     assert_eq!(cpu.sound_timer, 99);
+    // }
+
+    #[test]
+    fn test_op_call_and_ret() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.sp = 10;
+
+        execute_instruction(&mut cpu, &mut memory, 0x2DAD);
+        execute_instruction(&mut cpu, &mut memory, 0x00EE);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.sp, 10);
+        assert_eq!(cpu.stack[11], PROGRAM_START_ADDRESS);
     }
 }

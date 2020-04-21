@@ -4,9 +4,13 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::video::Window;
 
-const DISPLAY_WIDTH: usize = 64;
-const DISPLAY_HEIGHT: usize = 32;
+#[cfg(test)]
+use mockall::{automock, predicate::*};
 
+pub const DISPLAY_WIDTH: usize = 64;
+pub const DISPLAY_HEIGHT: usize = 32;
+
+#[cfg_attr(test, automock)]
 pub trait DisplayTrait {
     fn create_window(
         &self,

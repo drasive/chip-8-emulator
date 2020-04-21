@@ -3,11 +3,11 @@ extern crate sdl2;
 use sdl2::video::Window;
 use std::io::{Error, Read};
 
-use cpu::*;
-use display::*;
-use keypad::*;
-use memory::*;
-use speaker::*;
+use crate::cpu::*;
+use crate::display::*;
+use crate::keypad::*;
+use crate::memory::*;
+use crate::speaker::*;
 
 pub struct Emulator {
     pub cpu: Cpu,
