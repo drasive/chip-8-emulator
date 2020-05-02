@@ -638,7 +638,7 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     // Note: These tests cover more than just the CPU as they also integrate memory, display and keypad
-    // 
+    //
     // Tests based on:
     // - https://github.com/starrhorne/chip8-rust/blob/master/src/processor_test.rs (accessed 2020-04-21)
     // - https://github.com/ismaelrh/Java-chip8-emulator/blob/master/src/test/java/chip8/ProcessingUnitTest.java (accessed 2020-04-21)
@@ -885,7 +885,7 @@ mod tests {
         assert_eq!(cpu.v[0xA], 0x00);
     }
     #[test]
-    fn test_op_8xy0() {
+    fn test_op_8xy0_ldvxvy() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
         cpu.v[0xA] = 0x00;
@@ -1104,7 +1104,6 @@ mod tests {
         assert_eq!(display.read_pixel(0 + 3, 0xB), true);
     }
 
-
     #[test]
     fn test_op_dxyn_drwvxvyn_wrap_vertical() {
         let mut memory = instantiate_memory();
@@ -1191,95 +1190,136 @@ mod tests {
         assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
     }
 
+    #[test]
+    fn test_op_fx07_ldvxdt() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.delay_timer = 20;
+
+        execute_instruction(&mut cpu, &mut memory, 0xF707);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0x7], 20);
+    }
+
+    #[test]
+    fn test_op_fx0a_ldvxk() {
+        // Note: Keycode A is mapped to hex 0x7
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let mut keypad = instantiate_keypad();
+
+        // No keypress
+        execute_instruction_with_keypad(&mut cpu, &mut memory, &mut keypad, 0xF70A);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS);
+        assert_eq!(cpu.v[0x6], 0x0);
+
+        // Unmapped keypress
+        keypad.key_down(Keycode::P);
+        execute_instruction_with_keypad(&mut cpu, &mut memory, &mut keypad, 0xF70A);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS);
+        assert_eq!(cpu.v[0x6], 0x0);
+
+        // Mapped keypress
+        keypad.key_down(Keycode::A);
+        execute_instruction_with_keypad(&mut cpu, &mut memory, &mut keypad, 0xF60A);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0x6], 0x7);
+    }
+
+    #[test]
+    fn test_op_fx15_lddtvx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[6] = 7;
+
+        execute_instruction(&mut cpu, &mut memory, 0xF615);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.delay_timer, 7);
+    }
+    
+    #[test]
+    fn test_op_fx18_ldstvx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[6] = 7;
+
+        execute_instruction(&mut cpu, &mut memory, 0xF618);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.sound_timer, 7);
+    }
+
+    #[test]
+    fn test_op_fx1e_addivx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[6] = 0x07;
+        cpu.i = 0x000F;
+
+        execute_instruction(&mut cpu, &mut memory, 0xF61E);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.i, 0x16);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_op_fx1e_addivx_overflow() {
+        // TODO: Reenable test
+        // An overflow leads to a panic at the moment
+        // I'm not sure what the intended behaviour is
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[6] = 0x01;
+        cpu.i = 0xFFFF;
+
+        execute_instruction(&mut cpu, &mut memory, 0xF61E);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.i, 0x00);
+    }
+
+    #[test]
+    fn test_op_fx29_ldfvx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[7] = 9;
+
+        execute_instruction(&mut cpu, &mut memory, 0xF729);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.i, FONT_WIDTH as u16 * 9);
+    }
+
+    #[test]
+    fn test_op_fx33_ldbbvx_() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.i = 1000;
+        cpu.v[7] = 123;
+        execute_instruction(&mut cpu, &mut memory, 0xF733);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(memory.read(1000 + 0), 1);
+        assert_eq!(memory.read(1000 + 1), 2);
+        assert_eq!(memory.read(1000 + 2), 3);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.i = 1000;
+        cpu.v[7] = 159;
+        execute_instruction(&mut cpu, &mut memory, 0xF733);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(memory.read(1000 + 0), 1);
+        assert_eq!(memory.read(1000 + 1), 5);
+        assert_eq!(memory.read(1000 + 2), 9);
+    }
+    
     // TODO: Implement tests
-    // // LD Vx, DT
     // #[test]
-    // fn test_op_fx07() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.delay_timer = 20;
-    //     cpu.run_opcode(0xf507);
-    //     assert_eq!(cpu.v[5], 20);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // LD Vx, K
-    // #[test]
-    // fn test_op_fx0a() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.run_opcode(0xf50a);
-    //     assert_eq!(cpu.keypad_waiting, true);
-    //     assert_eq!(cpu.keypad_register, 5);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    //     // Tick with no keypresses doesn't do anything
-    //     cpu.tick([false; 16]);
-    //     assert_eq!(cpu.keypad_waiting, true);
-    //     assert_eq!(cpu.keypad_register, 5);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    //     // Tick with a keypress finishes wait and loads
-    //     // first pressed key into vx
-    //     cpu.tick([true; 16]);
-    //     assert_eq!(cpu.keypad_waiting, false);
-    //     assert_eq!(cpu.v[5], 0);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // LD DT, vX
-    // #[test]
-    // fn test_op_fx15() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.v[5] = 9;
-    //     cpu.run_opcode(0xf515);
-    //     assert_eq!(cpu.delay_timer, 9);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // LD ST, vX
-    // #[test]
-    // fn test_op_fx18() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.v[5] = 9;
-    //     cpu.run_opcode(0xf518);
-    //     assert_eq!(cpu.sound_timer, 9);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // ADD I, Vx
-    // #[test]
-    // fn test_op_fx1e() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.v[5] = 9;
-    //     cpu.i = 9;
-    //     cpu.run_opcode(0xf51e);
-    //     assert_eq!(cpu.i, 18);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // LD F, Vx
-    // #[test]
-    // fn test_op_fx29() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.v[5] = 9;
-    //     cpu.run_opcode(0xf529);
-    //     assert_eq!(cpu.i, 5 * 9);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // LD B, Vx
-    // #[test]
-    // fn test_op_fx33() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.v[5] = 123;
-    //     cpu.i = 1000;
-    //     cpu.run_opcode(0xf533);
-    //     assert_eq!(memory.cells[1000], 1);
-    //     assert_eq!(memory.cells[1001], 2);
-    //     assert_eq!(memory.cells[1002], 3);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // LD [I], Vx
-    // #[test]
-    // fn test_op_fx55() {
+    // fn test_op_fx55_ldivx() {
     //     let mut memory = instantiate_memory();
     //     let mut cpu = instantiate_cpu(&mut memory);
     //     cpu.i = 1000;
@@ -1289,9 +1329,9 @@ mod tests {
     //     }
     //     assert_eq!(cpu.pc, NEXT_PC);
     // }
-    // // LD Vx, [I]
+
     // #[test]
-    // fn test_op_fx65() {
+    // fn test_op_fx65_ldvxi() {
     //     let mut memory = instantiate_memory();
     //     let mut cpu = instantiate_cpu(&mut memory);
     //     for i in 0..16 as usize {
@@ -1304,6 +1344,7 @@ mod tests {
     //     }
     //     assert_eq!(cpu.pc, NEXT_PC);
     // }
+
     // #[test]
     // fn test_timers() {
     //     let mut memory = instantiate_memory();
