@@ -2,8 +2,7 @@
 
 An emulator for the Chip-8 programming language.  
 
-*Alpha Software: Not all components are fully implemented and bug-free.  
-It can only run a small subset of Chip-8 programs correctly.*
+It can run most demo programs but seems to have an issue with input, so most games aren't fun.
 
 ## Features
 - Supports all 35 instructions (excluding the deprecated SYS)
@@ -12,7 +11,9 @@ It can only run a small subset of Chip-8 programs correctly.*
 - Cross plattform support (Windows, Linux, Mac) but only tested on Windows
 
 ## TODO
-- Get most programs working
+- Fix input issue: Most but not all programs only seem to read key 0x0
+- Turn sound on by default
+- Add support for defining an execution speed factor
 - Support variable display and memory sizes
 
 ## Development Dependencies
