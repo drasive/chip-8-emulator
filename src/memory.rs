@@ -1,8 +1,8 @@
 const MEMORY_SIZE: usize = 4096;
 
 pub trait MemoryTrait {
-    fn get_cells(&mut self) -> &mut [u8; MEMORY_SIZE]; // TODO: Allow range access?
     fn read(&self, index: usize) -> u8;
+    fn read_all(&mut self) -> &mut [u8; MEMORY_SIZE];
     fn write(&mut self, index: usize, value: u8);
     fn clear(&mut self);
     fn get_size(&self) -> usize;
@@ -14,12 +14,12 @@ pub struct Memory {
 }
 
 impl MemoryTrait for Memory {
-    fn get_cells(&mut self) -> &mut [u8; MEMORY_SIZE] {
-        &mut self.cells
-    }
-
     fn read(&self, index: usize) -> u8 {
         self.cells[index]
+    }
+
+    fn read_all(&mut self) -> &mut [u8; MEMORY_SIZE] {
+        &mut self.cells
     }
 
     fn write(&mut self, index: usize, value: u8) {

@@ -95,7 +95,7 @@ impl CpuTrait for Cpu {
                 "Copying font ({font_bytes} bytes) to memory at 0x000",
                 font_bytes = FONT_BYTES
             );
-            let mut memory_stream = BufWriter::new(&mut memory.get_cells()[0..FONT_BYTES]);
+            let mut memory_stream = BufWriter::new(&mut memory.read_all()[0..FONT_BYTES]);
             memory_stream.write_all(FONT.as_ref()).unwrap();
         }
 
@@ -118,7 +118,7 @@ impl CpuTrait for Cpu {
                 program_start = self.program_address
             );
             let mut memory_stream = BufWriter::new(
-                &mut memory.get_cells()[self.program_address..(self.program_address + rom.len())],
+                &mut memory.read_all()[self.program_address..(self.program_address + rom.len())],
             );
             r#try!(memory_stream.write_all(rom.as_ref()));
         }
@@ -429,7 +429,7 @@ impl Cpu {
                 self.v[0xF] = display.draw_sprite(
                     self.v[x] as usize,
                     self.v[y] as usize,
-                    &memory.get_cells()[start..end],
+                    &memory.read_all()[start..end],
                 );
 
                 self.pc += 2;
@@ -637,9 +637,14 @@ impl Cpu {
 // TODO: Split into separate file
 #[cfg(test)]
 mod tests {
+    // Note: These tests cover more than just the CPU as they also integrate memory, display and keypad
+    // 
     // Tests based on:
     // - https://github.com/starrhorne/chip8-rust/blob/master/src/processor_test.rs (accessed 2020-04-21)
     // - https://github.com/ismaelrh/Java-chip8-emulator/blob/master/src/test/java/chip8/ProcessingUnitTest.java (accessed 2020-04-21)
+    
+    use sdl2::keyboard::Keycode;
+    
     use super::*;
     use crate::display::*;
     use crate::keypad::*;
@@ -667,6 +672,14 @@ mod tests {
         Memory::new() // Not mocked dued to simplicity
     }
 
+    fn instantiate_display() -> Display {
+        Display::new(1) // Not mocked dued to simplicity
+    }
+
+    fn instantiate_keypad() -> Keypad {
+        Keypad::new() // Not mocked dued to simplicity
+    }
+
     fn execute_instruction(cpu: &mut Cpu, memory: &mut dyn MemoryTrait, opcode: u16) {
         let mut keypad = MockKeypadTrait::new();
         let mut display = MockDisplayTrait::new();
@@ -675,13 +688,36 @@ mod tests {
         cpu.execute_instruction(memory, &mut keypad, &mut display);
     }
 
+    fn execute_instruction_with_display(
+        cpu: &mut Cpu,
+        memory: &mut dyn MemoryTrait,
+        display: &mut dyn DisplayTrait,
+        opcode: u16,
+    ) {
+        let mut keypad = MockKeypadTrait::new();
+
+        cpu.opcode = opcode;
+        cpu.execute_instruction(memory, &mut keypad, display);
+    }
+
+    fn execute_instruction_with_keypad(
+        cpu: &mut Cpu,
+        memory: &mut dyn MemoryTrait,
+        keypad: &mut dyn KeypadTrait,
+        opcode: u16,
+    ) {
+        let mut display = MockDisplayTrait::new();
+
+        cpu.opcode = opcode;
+        cpu.execute_instruction(memory, keypad, &mut display);
+    }
+
     fn test_math(v1: u8, v2: u8, operation: u16, expected_result: u8, expected_vf: u8) {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
         cpu.v[0x0] = v1;
         cpu.v[0x1] = v2;
         cpu.v[0xf] = 0;
-        
         execute_instruction(&mut cpu, &mut memory, 0x8010 + operation);
 
         assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
@@ -700,11 +736,11 @@ mod tests {
         assert_eq!(cpu.i, 0);
 
         // First char in font: 0
-        assert_eq!(memory.get_cells()[0..5], [0xF0, 0x90, 0x90, 0x90, 0xF0]);
+        assert_eq!(memory.read_all()[0..5], [0xF0, 0x90, 0x90, 0x90, 0xF0]);
 
         // Last char in font: F
         assert_eq!(
-            memory.get_cells()[FONT.len() - 5..FONT.len()],
+            memory.read_all()[FONT.len() - 5..FONT.len()],
             [0xF0, 0x80, 0xF0, 0x80, 0x80]
         );
     }
@@ -848,7 +884,6 @@ mod tests {
         assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
         assert_eq!(cpu.v[0xA], 0x00);
     }
-    
     #[test]
     fn test_op_8xy0() {
         let mut memory = instantiate_memory();
@@ -891,7 +926,6 @@ mod tests {
         test_math(0x0F, 0x01, 5, 0x0E, 1);
         test_math(0x0F, 0xFF, 5, 0x10, 0);
     }
- 
     #[test]
     fn test_op_8x06_shrvx() {
         // 4 >> 1 == 2
@@ -963,97 +997,201 @@ mod tests {
         assert_eq!(cpu.v[0xA], 0);
     }
 
+    #[test]
+    fn test_op_dxyn_drwvxvyn() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0x8] = 0xA; // Set X position for drawing
+        cpu.v[0x9] = 0xB; // Set Y position for drawing
+        cpu.i = (PROGRAM_START_ADDRESS + 6) as u16;
+
+        // Sprites to draw
+        memory.write(PROGRAM_START_ADDRESS + 6, 0b11010000);
+        memory.write(PROGRAM_START_ADDRESS + 7, 0b10100000);
+
+        let mut display = instantiate_display();
+        execute_instruction_with_display(&mut cpu, &mut memory, &mut display, 0xD892);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xF], 0);
+
+        assert_eq!(display.read_pixel(0xA + 0, 0xB + 0), true);
+        assert_eq!(display.read_pixel(0xA + 1, 0xB + 0), true);
+        assert_eq!(display.read_pixel(0xA + 2, 0xB + 0), false);
+        assert_eq!(display.read_pixel(0xA + 3, 0xB + 0), true);
+        assert_eq!(display.read_pixel(0xA + 4, 0xB + 0), false);
+        assert_eq!(display.read_pixel(0xA + 5, 0xB + 0), false);
+        assert_eq!(display.read_pixel(0xA + 6, 0xB + 0), false);
+        assert_eq!(display.read_pixel(0xA + 8, 0xB + 0), false);
+        assert_eq!(display.read_pixel(0xA + 8, 0xB + 0), false);
+
+        assert_eq!(display.read_pixel(0xA + 0, 0xB + 1), true);
+        assert_eq!(display.read_pixel(0xA + 1, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 2, 0xB + 1), true);
+        assert_eq!(display.read_pixel(0xA + 3, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 4, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 5, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 6, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 8, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 8, 0xB + 1), false);
+    }
+
+    #[test]
+    fn test_op_dxyn_drwvxvyn_erase() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.v[0x8] = 0xA; // Set X position for drawing
+        cpu.v[0x9] = 0xB; // Set Y position for drawing
+        cpu.i = (PROGRAM_START_ADDRESS + 6) as u16;
+
+        // Sprites to draw
+        memory.write(PROGRAM_START_ADDRESS + 6, 0b11010000);
+        memory.write(PROGRAM_START_ADDRESS + 7, 0b10100000);
+
+        // Initial display state
+        let mut display = instantiate_display();
+        display.write_pixel(0xA + 0, 0xB + 1, true);
+
+        execute_instruction_with_display(&mut cpu, &mut memory, &mut display, 0xD892);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xF], 1);
+
+        assert_eq!(display.read_pixel(0xA + 0, 0xB + 0), true);
+        assert_eq!(display.read_pixel(0xA + 1, 0xB + 0), true);
+        assert_eq!(display.read_pixel(0xA + 2, 0xB + 0), false);
+        assert_eq!(display.read_pixel(0xA + 3, 0xB + 0), true);
+        assert_eq!(display.read_pixel(0xA + 4, 0xB + 0), false);
+        assert_eq!(display.read_pixel(0xA + 5, 0xB + 0), false);
+        assert_eq!(display.read_pixel(0xA + 6, 0xB + 0), false);
+        assert_eq!(display.read_pixel(0xA + 7, 0xB + 0), false);
+
+        assert_eq!(display.read_pixel(0xA + 0, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 1, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 2, 0xB + 1), true);
+        assert_eq!(display.read_pixel(0xA + 3, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 4, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 5, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 6, 0xB + 1), false);
+        assert_eq!(display.read_pixel(0xA + 7, 0xB + 1), false);
+    }
+
+    #[test]
+    fn test_op_dxyn_drwvxvyn_wrap_horizontal() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let x_position = crate::display::DISPLAY_WIDTH - 4;
+        cpu.v[0x8] = x_position as u8; // Set X position for drawing
+        cpu.v[0x9] = 0xB; // Set Y position for drawing
+        cpu.i = (PROGRAM_START_ADDRESS + 6) as u16;
+
+        // Sprites to draw
+        memory.write(PROGRAM_START_ADDRESS + 6, 0b00101011);
+
+        let mut display = instantiate_display();
+        execute_instruction_with_display(&mut cpu, &mut memory, &mut display, 0xD891);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xF], 0);
+
+        assert_eq!(display.read_pixel(x_position + 0, 0xB), false);
+        assert_eq!(display.read_pixel(x_position + 1, 0xB), false);
+        assert_eq!(display.read_pixel(x_position + 2, 0xB), true);
+        assert_eq!(display.read_pixel(x_position + 3, 0xB), false);
+        assert_eq!(display.read_pixel(0 + 0, 0xB), true);
+        assert_eq!(display.read_pixel(0 + 1, 0xB), false);
+        assert_eq!(display.read_pixel(0 + 2, 0xB), true);
+        assert_eq!(display.read_pixel(0 + 3, 0xB), true);
+    }
+
+
+    #[test]
+    fn test_op_dxyn_drwvxvyn_wrap_vertical() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let y_position = crate::display::DISPLAY_HEIGHT - 1;
+        cpu.v[0x8] = 0xA; // Set X position for drawing
+        cpu.v[0x9] = y_position as u8; // Set Y position for drawing
+        cpu.i = (PROGRAM_START_ADDRESS + 6) as u16;
+
+        // Sprites to draw
+        memory.write(PROGRAM_START_ADDRESS + 6, 0b00101011);
+        memory.write(PROGRAM_START_ADDRESS + 7, 0b10100000);
+
+        let mut display = instantiate_display();
+        execute_instruction_with_display(&mut cpu, &mut memory, &mut display, 0xD892);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        assert_eq!(cpu.v[0xF], 0);
+
+        assert_eq!(display.read_pixel(0xA + 0, y_position), false);
+        assert_eq!(display.read_pixel(0xA + 1, y_position), false);
+        assert_eq!(display.read_pixel(0xA + 2, y_position), true);
+        assert_eq!(display.read_pixel(0xA + 3, y_position), false);
+        assert_eq!(display.read_pixel(0xA + 4, y_position), true);
+        assert_eq!(display.read_pixel(0xA + 5, y_position), false);
+        assert_eq!(display.read_pixel(0xA + 6, y_position), true);
+        assert_eq!(display.read_pixel(0xA + 7, y_position), true);
+
+        assert_eq!(display.read_pixel(0xA + 0, 0), true);
+        assert_eq!(display.read_pixel(0xA + 1, 0), false);
+        assert_eq!(display.read_pixel(0xA + 2, 0), true);
+        assert_eq!(display.read_pixel(0xA + 3, 0), false);
+        assert_eq!(display.read_pixel(0xA + 4, 0), false);
+        assert_eq!(display.read_pixel(0xA + 5, 0), false);
+        assert_eq!(display.read_pixel(0xA + 6, 0), false);
+        assert_eq!(display.read_pixel(0xA + 7, 0), false);
+    }
+
+    #[test]
+    fn test_op_ex9e_skpvx() {
+        // Note: Keycode A is mapped to hex 0x7
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let mut keypad = instantiate_keypad();
+        execute_instruction_with_keypad(&mut cpu, &mut memory, &mut keypad, 0xE79E);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
+        keypad.key_down(Keycode::S);
+        execute_instruction_with_keypad(&mut cpu, &mut memory, &mut keypad, 0xE79E);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1 + 2 * 1);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let mut keypad = instantiate_keypad();
+        keypad.key_down(Keycode::A);
+        keypad.key_down(Keycode::X);
+        keypad.key_up(Keycode::S);
+        keypad.key_down(Keycode::A);
+        execute_instruction_with_keypad(&mut cpu, &mut memory, &mut keypad, 0xE79E);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
+    }
+
+    #[test]
+    fn test_op_exa1_sknpvx() {
+        // Note: Keycode A is mapped to hex 0x7
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let mut keypad = instantiate_keypad();
+        execute_instruction_with_keypad(&mut cpu, &mut memory, &mut keypad, 0xE7A1);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2);
+        keypad.key_down(Keycode::S);
+        execute_instruction_with_keypad(&mut cpu, &mut memory, &mut keypad, 0xE7A1);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 2 + 2 * 2);
+
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let mut keypad = instantiate_keypad();
+        keypad.key_down(Keycode::A);
+        keypad.key_down(Keycode::X);
+        keypad.key_up(Keycode::S);
+        keypad.key_down(Keycode::A);
+        execute_instruction_with_keypad(&mut cpu, &mut memory, &mut keypad, 0xE7A1);
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2 * 1);
+    }
+
     // TODO: Implement tests
-    // // DRW Vx, Vy, nibble
-    // #[test]
-    // fn test_op_dxyn() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.i = 0;
-    //     memory.cells[0] = 0b11111111;
-    //     memory.cells[1] = 0b00000000;
-    //     cpu.vram[0][0] = 1;
-    //     cpu.vram[0][1] = 0;
-    //     cpu.vram[1][0] = 1;
-    //     cpu.vram[1][1] = 0;
-    //     cpu.v[0] = 0;
-    //     cpu.run_opcode(0xd002);
-    //     assert_eq!(cpu.vram[0][0], 0);
-    //     assert_eq!(cpu.vram[0][1], 1);
-    //     assert_eq!(cpu.vram[1][0], 1);
-    //     assert_eq!(cpu.vram[1][1], 0);
-    //     assert_eq!(cpu.v[0x0f], 1);
-    //     assert!(cpu.vram_changed);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // #[test]
-    // fn test_op_dxyn_wrap_horizontal() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     let x = CHIP8_WIDTH - 4;
-    //     cpu.i = 0;
-    //     memory.cells[0] = 0b11111111;
-    //     cpu.v[0] = x as u8;
-    //     cpu.v[1] = 0;
-    //     cpu.run_opcode(0xd011);
-    //     assert_eq!(cpu.vram[0][x - 1], 0);
-    //     assert_eq!(cpu.vram[0][x], 1);
-    //     assert_eq!(cpu.vram[0][x + 1], 1);
-    //     assert_eq!(cpu.vram[0][x + 2], 1);
-    //     assert_eq!(cpu.vram[0][x + 3], 1);
-    //     assert_eq!(cpu.vram[0][0], 1);
-    //     assert_eq!(cpu.vram[0][1], 1);
-    //     assert_eq!(cpu.vram[0][2], 1);
-    //     assert_eq!(cpu.vram[0][3], 1);
-    //     assert_eq!(cpu.vram[0][4], 0);
-    //     assert_eq!(cpu.v[0x0f], 0);
-    // }
-    // // DRW Vx, Vy, nibble
-    // #[test]
-    // fn test_op_dxyn_wrap_vertical() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     let y = CHIP8_HEIGHT - 1;
-    //     cpu.i = 0;
-    //     memory.cells[0] = 0b11111111;
-    //     memory.cells[1] = 0b11111111;
-    //     cpu.v[0] = 0;
-    //     cpu.v[1] = y as u8;
-    //     cpu.run_opcode(0xd012);
-    //     assert_eq!(cpu.vram[y][0], 1);
-    //     assert_eq!(cpu.vram[0][0], 1);
-    //     assert_eq!(cpu.v[0x0f], 0);
-    // }
-    // // SKP Vx
-    // #[test]
-    // fn test_op_ex9e() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.keypad[9] = true;
-    //     cpu.v[5] = 9;
-    //     cpu.run_opcode(0xe59e);
-    //     assert_eq!(cpu.pc, SKIPPED_PC);
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.v[5] = 9;
-    //     cpu.run_opcode(0xe59e);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
-    // // SKNP Vx
-    // #[test]
-    // fn test_op_exa1() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.keypad[9] = true;
-    //     cpu.v[5] = 9;
-    //     cpu.run_opcode(0xe5a1);
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.v[5] = 9;
-    //     cpu.run_opcode(0xe5a1);
-    //     assert_eq!(cpu.pc, SKIPPED_PC);
-    // }
     // // LD Vx, DT
     // #[test]
     // fn test_op_fx07() {
