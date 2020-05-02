@@ -102,7 +102,7 @@ impl CpuTrait for Cpu {
         // Read ROM
         println!("Reading ROM");
         let mut rom = Vec::new();
-        r#try!(rom_reader.read_to_end(&mut rom));
+        rom_reader.read_to_end(&mut rom)?;
 
         // Copy ROM into memory
         if rom.len() < 2 {
@@ -120,7 +120,7 @@ impl CpuTrait for Cpu {
             let mut memory_stream = BufWriter::new(
                 &mut memory.read_all()[self.program_address..(self.program_address + rom.len())],
             );
-            r#try!(memory_stream.write_all(rom.as_ref()));
+            memory_stream.write_all(rom.as_ref())?;
         }
 
         self.pc = self.program_address;
@@ -642,13 +642,12 @@ mod tests {
     // Tests based on:
     // - https://github.com/starrhorne/chip8-rust/blob/master/src/processor_test.rs (accessed 2020-04-21)
     // - https://github.com/ismaelrh/Java-chip8-emulator/blob/master/src/test/java/chip8/ProcessingUnitTest.java (accessed 2020-04-21)
-    
-    use sdl2::keyboard::Keycode;
-    
     use super::*;
     use crate::display::*;
     use crate::keypad::*;
     use crate::memory::*;
+    use crate::speaker::*;
+    use sdl2::keyboard::Keycode;
 
     const PROGRAM_START_ADDRESS: usize = 0x200;
 
@@ -758,6 +757,43 @@ mod tests {
     }
 
     #[test]
+    fn test_timers() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let mut speaker = MockSpeakerTrait::new();
+        cpu.delay_timer = 100;
+        cpu.delay_timer_f = 100.0;
+        cpu.sound_timer = 200;
+        cpu.sound_timer_f = 200.0;
+
+        cpu.update_delay_timer((01.0 / 60.0) * 1000.0);
+        cpu.update_sound_timer((60.1 / 60.0) * 1000.0, &mut speaker);
+
+        assert_eq!(cpu.delay_timer, 99);
+        assert_eq!(cpu.sound_timer, 140);
+    }
+
+    #[test]
+    fn test_timers_bottom_out() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let mut speaker = MockSpeakerTrait::new();
+        speaker.expect_queue_beep()
+            .times(1)
+            .return_const(());
+        cpu.delay_timer = 10;
+        cpu.delay_timer_f = 10.0;
+        cpu.sound_timer = 10;
+        cpu.sound_timer_f = 10.0;
+        
+        cpu.update_delay_timer((60.0 / 60.0) * 1000.0);
+        cpu.update_sound_timer((60.0 / 60.0) * 1000.0, &mut speaker);
+
+        assert_eq!(cpu.delay_timer, 0);
+        assert_eq!(cpu.sound_timer, 0);
+    }
+
+    #[test]
     fn test_call_and_ret() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
@@ -771,7 +807,22 @@ mod tests {
         assert_eq!(cpu.stack[11], PROGRAM_START_ADDRESS);
     }
 
-    // TODO: CLS
+    #[test]
+    fn test_op_00e0_cls() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        let mut display = instantiate_display();
+        display.write_pixel(32, 23, true);
+
+        execute_instruction_with_display(&mut cpu, &mut memory, &mut display, 0x00E0);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        for x in 0..DISPLAY_WIDTH {
+            for y in 0..DISPLAY_HEIGHT {
+                assert_eq!(display.read_pixel(x, y), false);
+            }
+        }
+    }
 
     #[test]
     fn test_op_00ee_ret() {
@@ -987,7 +1038,7 @@ mod tests {
 
     #[test]
     fn test_op_cxkk_randvx() {
-        // TODO: Add test for non null value
+        // TODO: Add variant for non null random value
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
 
@@ -1239,7 +1290,7 @@ mod tests {
         assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
         assert_eq!(cpu.delay_timer, 7);
     }
-    
+
     #[test]
     fn test_op_fx18_ldstvx() {
         let mut memory = instantiate_memory();
@@ -1295,7 +1346,7 @@ mod tests {
     }
 
     #[test]
-    fn test_op_fx33_ldbbvx_() {
+    fn test_op_fx33_ldbbvx() {
         let mut memory = instantiate_memory();
         let mut cpu = instantiate_cpu(&mut memory);
         cpu.i = 1000;
@@ -1316,43 +1367,42 @@ mod tests {
         assert_eq!(memory.read(1000 + 1), 5);
         assert_eq!(memory.read(1000 + 2), 9);
     }
-    
-    // TODO: Implement tests
-    // #[test]
-    // fn test_op_fx55_ldivx() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.i = 1000;
-    //     cpu.run_opcode(0xff55);
-    //     for i in 0..16 {
-    //         assert_eq!(memory.cells[1000 + i as usize], cpu.v[i]);
-    //     }
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
 
-    // #[test]
-    // fn test_op_fx65_ldvxi() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     for i in 0..16 as usize {
-    //         memory.cells[1000 + i] = i as u8;
-    //     }
-    //     cpu.i = 1000;
-    //     cpu.run_opcode(0xff65);
-    //     for i in 0..16 as usize {
-    //         assert_eq!(cpu.v[i], memory.cells[1000 + i]);
-    //     }
-    //     assert_eq!(cpu.pc, NEXT_PC);
-    // }
+    #[test]
+    fn test_op_fx55_ldivx() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.i = 1000;
+        cpu.v[0x0] = 0x0;
+        cpu.v[0x6] = 0x1;
+        cpu.v[0x7] = 0x2;
+        cpu.v[0x8] = 0x3;
+        cpu.v[0xF] = 0x9;
 
-    // #[test]
-    // fn test_timers() {
-    //     let mut memory = instantiate_memory();
-    //     let mut cpu = instantiate_cpu(&mut memory);
-    //     cpu.delay_timer = 200;
-    //     cpu.sound_timer = 100;
-    //     cpu.tick([false; 16]);
-    //     assert_eq!(cpu.delay_timer, 199);
-    //     assert_eq!(cpu.sound_timer, 99);
-    // }
+        execute_instruction(&mut cpu, &mut memory, 0xFF55);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        for i in 0..16 {
+            assert_eq!(memory.read(1000 + i as usize), cpu.v[i]);
+        }
+    }
+        
+    #[test]
+    fn test_op_fx65_ldvxi() {
+        let mut memory = instantiate_memory();
+        let mut cpu = instantiate_cpu(&mut memory);
+        cpu.i = 1000;
+        memory.write(1000 + 0x0, 0x0);
+        memory.write(1000 + 0x6, 0x1);
+        memory.write(1000 + 0x7, 0x2);
+        memory.write(1000 + 0x8, 0x3);
+        memory.write(1000 + 0xF, 0x9);
+
+        execute_instruction(&mut cpu, &mut memory, 0xFF55);
+
+        assert_eq!(cpu.pc, PROGRAM_START_ADDRESS + 2);
+        for i in 0..16 {
+            assert_eq!(memory.read(1000 + i as usize), cpu.v[i]);
+        }
+    }
 }
