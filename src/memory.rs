@@ -1,42 +1,40 @@
 const MEMORY_SIZE: usize = 4096;
 
-
-pub struct Memory {
-    pub cells: [u8; MEMORY_SIZE] // 8-bit memory. Public in order to allow batch access.
+pub trait MemoryTrait {
+    fn read(&self, index: usize) -> u8;
+    fn read_all(&mut self) -> &mut [u8; MEMORY_SIZE];
+    fn write(&mut self, index: usize, value: u8);
+    fn clear(&mut self);
+    fn get_size(&self) -> usize;
+    fn print_debug_info(&self);
 }
 
+pub struct Memory {
+    cells: [u8; MEMORY_SIZE], // 8-bit memory. Public in order to allow batch access.
+}
 
-impl Memory {
-
-    // Constructors
-    pub fn new() -> Memory {
-        println!("Initializing {memory_size} bytes of main memory", memory_size = MEMORY_SIZE);
-
-        Memory {
-            cells: [0; MEMORY_SIZE]
-        }
-    }
-
-
-    // Methods
-    pub fn read(&self, index: usize) -> u8 {
+impl MemoryTrait for Memory {
+    fn read(&self, index: usize) -> u8 {
         self.cells[index]
     }
 
-    pub fn write(&mut self, index: usize, value: u8) {
+    fn read_all(&mut self) -> &mut [u8; MEMORY_SIZE] {
+        &mut self.cells
+    }
+
+    fn write(&mut self, index: usize, value: u8) {
         self.cells[index] = value;
     }
 
-    pub fn clear(&mut self) {
+    fn clear(&mut self) {
         self.cells = [0; MEMORY_SIZE];
     }
 
-    
-    pub fn get_size(&self) -> usize {
-        MEMORY_SIZE    
+    fn get_size(&self) -> usize {
+        MEMORY_SIZE
     }
 
-    pub fn print_debug_info(&self) {
+    fn print_debug_info(&self) {
         println!("");
 
         for index in 0..MEMORY_SIZE {
@@ -51,11 +49,21 @@ impl Memory {
             }
         }
     }
+}
 
+impl Memory {
+    pub fn new() -> Memory {
+        println!(
+            "Initializing {memory_size} bytes of main memory",
+            memory_size = MEMORY_SIZE
+        );
 
-    // Helpers
+        Memory {
+            cells: [0; MEMORY_SIZE],
+        }
+    }
+
     fn modulo(n1: usize, n2: usize) -> usize {
         n1 - n2 * ((n1 / n2) as usize)
     }
-
 }

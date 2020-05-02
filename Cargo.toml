@@ -1,10 +1,15 @@
 [package]
 name = "chip-8-emulator"
 version = "0.1.0"
+edition = "2018"
 authors = ["Dimitri Vranken <me@dimitrivranken.com>"]
 
 [dependencies]
-rand = "^0"
-time = "^0"
 clap = { version = "^2", features = ["yaml"] }
+rand = "^0"
+rodio = "^0"
 sdl2 = "^0"
+time = "^0"
+
+[dev-dependencies]
+mockall = "^0"
