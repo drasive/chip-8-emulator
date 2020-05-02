@@ -515,7 +515,7 @@ impl Cpu {
                 // the tens digit at location I+1, and the ones digit at location I+2.
                 memory.write(self.i as usize, self.v[x] / 100);
                 memory.write(self.i as usize + 1, (self.v[x] / 10) % 10);
-                memory.write(self.i as usize + 2, (self.v[x] % 100) & 10);
+                memory.write(self.i as usize + 2, self.v[x] % 10);
 
                 self.pc += 2;
             }
