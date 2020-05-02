@@ -9,6 +9,8 @@ use mockall::{automock, predicate::*};
 
 pub const DISPLAY_WIDTH: usize = 64;
 pub const DISPLAY_HEIGHT: usize = 32;
+const COLOR_ON: sdl2::pixels::Color = Color::RGB(109, 170, 44);
+const COLOR_OFF: sdl2::pixels::Color = Color::RGB(2, 95, 95);
 
 #[cfg_attr(test, automock)]
 pub trait DisplayTrait {
@@ -18,9 +20,14 @@ pub trait DisplayTrait {
         title_addition: &str,
     ) -> sdl2::video::Window;
     fn draw_sprite(&mut self, x: usize, y: usize, sprite: &[u8]) -> u8;
+    fn needs_redraw(&self) -> bool;
     fn draw(&mut self, renderer: &mut sdl2::render::Canvas<Window>);
     fn clear(&mut self);
-    fn needs_redraw(&self) -> bool;
+}
+
+pub trait DisplayDebugTrait {
+    fn read_pixel(&self, x: usize, y: usize) -> bool;
+    fn write_pixel(&mut self, x: usize, y: usize, value: bool);
 }
 
 pub struct Display {
@@ -72,13 +79,17 @@ impl DisplayTrait for Display {
         collision
     }
 
+    fn needs_redraw(&self) -> bool {
+        self.needs_redraw
+    }
+
     fn draw(&mut self, renderer: &mut sdl2::render::Canvas<Window>) {
         for x in 0..DISPLAY_WIDTH {
             for y in 0..DISPLAY_HEIGHT {
                 if self.pixels[x as usize][y as usize] {
-                    renderer.set_draw_color(Color::RGB(109, 170, 44));
+                    renderer.set_draw_color(COLOR_ON);
                 } else {
-                    renderer.set_draw_color(Color::RGB(2, 95, 95));
+                    renderer.set_draw_color(COLOR_OFF);
                 }
 
                 renderer
@@ -99,9 +110,15 @@ impl DisplayTrait for Display {
     fn clear(&mut self) {
         self.pixels = [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH];
     }
+}
 
-    fn needs_redraw(&self) -> bool {
-        self.needs_redraw
+impl DisplayDebugTrait for Display {
+    fn read_pixel(&self, x: usize, y: usize) -> bool {
+        self.pixels[x][y]
+    }
+
+    fn write_pixel(&mut self, x: usize, y: usize, value: bool) {
+        self.pixels[x][y] = value;
     }
 }
 
